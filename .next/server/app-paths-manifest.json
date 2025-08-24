@@ -1,0 +1,5 @@
+{
+  "/search/page": "app/search/page.js",
+  "/books/[...id]/page": "app/books/[...id]/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js"
+}
