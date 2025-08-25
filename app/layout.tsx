@@ -5,28 +5,30 @@ import { Providers } from "./providers";
 import { Navigation } from "../components/layout/Navigation";
 import { AuthGuard } from "../components/auth/AuthGuard";
 import OnboardingDataSync from "../components/auth/OnboardingDataSync";
+import DataMigration from "../components/utils/DataMigration";
 import { SessionDebug } from "../components/debug/SessionDebug";
+import { CustomCursor } from "../components/ui/CustomCursor";
 import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL || "http://localhost:3000"),
-  title: "BookHaven - Your Reading Companion",
+  title: "Book Haven - Your Reading Companion",
   description:
     "A modern Goodreads alternative for discovering, tracking, and sharing your reading journey",
   manifest: "/manifest.json",
   keywords: ["books", "reading", "reviews", "book club", "social reading"],
   authors: [{ name: "BookHaven Team" }],
-  creator: "BookHaven",
+  creator: "Book Haven",
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://bookhaven.app",
-    title: "BookHaven - Your Reading Companion",
+    title: "Book Haven - Your Reading Companion",
     description:
       "A modern Goodreads alternative for discovering, tracking, and sharing your reading journey",
-    siteName: "BookHaven",
+    siteName: "Book Haven",
     images: [
       {
         url: "/og-image.png",
@@ -37,7 +39,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "BookHaven - Your Reading Companion",
+    title: "Book Haven - Your Reading Companion",
     description:
       "A modern Goodreads alternative for discovering, tracking, and sharing your reading journey",
     images: ["/og-image.png"],
@@ -73,7 +75,9 @@ export default function RootLayout({
         className={`${inter.className} bg-white dark:bg-gray-900 text-gray-900 dark:text-white`}
       >
         <Providers>
+          <CustomCursor />
           <OnboardingDataSync />
+          <DataMigration />
           <AuthGuard>
             <div className="min-h-screen flex flex-col">
               <Navigation />
@@ -90,7 +94,7 @@ export default function RootLayout({
               }}
             />
           </AuthGuard>
-          <SessionDebug />
+          {/* <SessionDebug /> */}
         </Providers>
       </body>
     </html>

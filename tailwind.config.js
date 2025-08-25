@@ -46,6 +46,9 @@ module.exports = {
           900: "#854d0e",
         },
       },
+      height: {
+        88: "22rem", // 352px - custom height for medium book cards
+      },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         serif: ["Crimson Text", "serif"],

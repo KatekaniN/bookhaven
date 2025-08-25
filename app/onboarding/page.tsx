@@ -107,14 +107,6 @@ export default function OnboardingPage() {
   // Local state for onboarding form data only
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  export default function OnboardingPage() {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const onboarding = useOnboardingState();
-  const userData = useUserData();
-  const store = useHydratedStore();
-  const { addUserBook } = useAppStore();
-
   const [data, setData] = useState<OnboardingData>({
     favoriteGenres: [],
     readingGoal: 12,
@@ -234,29 +226,29 @@ export default function OnboardingPage() {
 
       // Add rated books to user's library
       const ratedBooksToAdd = data.bookRatings
-        .filter(rating => rating.rating >= 3) // Only add books rated 3+ stars
+        .filter((rating) => rating.rating >= 3) // Only add books rated 3+ stars
         .map((rating, index) => {
           // Create meaningful book entries from onboarding ratings
           const bookTitles = [
             "The Seven Husbands of Evelyn Hugo",
-            "Educated", 
+            "Educated",
             "The Thursday Murder Club",
             "Atomic Habits",
             "The Midnight Library",
             "Project Hail Mary",
             "Klara and the Sun",
-            "The Silent Patient"
+            "The Silent Patient",
           ];
-          
+
           const bookAuthors = [
             "Taylor Jenkins Reid",
             "Tara Westover",
-            "Richard Osman", 
+            "Richard Osman",
             "James Clear",
             "Matt Haig",
             "Andy Weir",
             "Kazuo Ishiguro",
-            "Alex Michaelides"
+            "Alex Michaelides",
           ];
 
           const bookCovers = [
@@ -267,18 +259,19 @@ export default function OnboardingPage() {
             "https://covers.openlibrary.org/b/isbn/9780525559474-L.jpg",
             "https://covers.openlibrary.org/b/isbn/9780593135204-L.jpg",
             "https://covers.openlibrary.org/b/isbn/9780593318171-L.jpg",
-            "https://covers.openlibrary.org/b/isbn/9781250301697-L.jpg"
+            "https://covers.openlibrary.org/b/isbn/9781250301697-L.jpg",
           ];
 
           const bookId = rating.bookId || rating.id;
           const bookIndex = Math.min(index, bookTitles.length - 1);
-          
+
           return {
             id: `onboarding-${bookId}`,
             title: bookTitles[bookIndex],
             author: bookAuthors[bookIndex],
             cover: bookCovers[bookIndex],
-            description: "Book rated during onboarding - added to your reading history",
+            description:
+              "Book rated during onboarding - added to your reading history",
             pages: 300 + Math.floor(Math.random() * 200), // Random page count 300-500
             publishedYear: 2018 + Math.floor(Math.random() * 6), // Random year 2018-2023
             genre: data.favoriteGenres.slice(0, 2),
@@ -286,21 +279,31 @@ export default function OnboardingPage() {
             isbn: "",
             rating: 4.0 + Math.random(),
             status: "read" as const,
-            dateAdded: new Date().toISOString().split('T')[0],
+            dateAdded: new Date().toISOString().split("T")[0],
             currentPage: 300 + Math.floor(Math.random() * 200),
-            startedReading: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            finishedReading: new Date().toISOString().split('T')[0],
+            startedReading: new Date(
+              Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
+            )
+              .toISOString()
+              .split("T")[0],
+            finishedReading: new Date().toISOString().split("T")[0],
             userRating: rating.rating,
             userReview: `Rated ${rating.rating} stars during onboarding - this was a great read that helped shape my reading preferences!`,
-            reviewDate: new Date().toISOString().split('T')[0]
+            reviewDate: new Date().toISOString().split("T")[0],
           };
         });
 
       // Add books to user library
-      ratedBooksToAdd.forEach(book => addUserBook(book));
+      ratedBooksToAdd.forEach((book) => addUserBook(book));
 
       // Show success message
-      toast.success(`Welcome to BookHaven! ${ratedBooksToAdd.length > 0 ? `${ratedBooksToAdd.length} rated books added to your library!` : 'Your reading journey begins now!'}`);
+      toast.success(
+        `Welcome to Book Haven! ${
+          ratedBooksToAdd.length > 0
+            ? `${ratedBooksToAdd.length} rated books added to your library!`
+            : "Your reading journey begins now!"
+        }`
+      );
 
       // Try to save to API if authenticated (but don't block the flow)
       if (session?.user?.email) {
@@ -650,7 +653,7 @@ export default function OnboardingPage() {
         {onboarding.currentStep === 1 && (
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Welcome to BookHaven, {session?.user?.name || "Reader"}! 👋
+              Welcome to Book Haven, {session?.user?.name || "Reader"}! 👋
             </h1>
             <p className="text-gray-600 dark:text-gray-300">
               Let's personalize your reading experience in just a few steps

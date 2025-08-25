@@ -1,5 +1,11 @@
 {
-  "/search/page": "app/search/page.js",
-  "/books/[...id]/page": "app/books/[...id]/page.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/discovery/page": "app/discovery/page.js",
+  "/auth/signin/page": "app/auth/signin/page.js",
+  "/onboarding/page": "app/onboarding/page.js",
+  "/stats/page": "app/stats/page.js",
+  "/page": "app/page.js",
+  "/api/recommendations/route": "app/api/recommendations/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/featured/route": "app/api/featured/route.js"
 }

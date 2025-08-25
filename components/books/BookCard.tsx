@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { HeartIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { HeartIcon, PlusIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import { useAppStore, UserBook } from "../../stores/useAppStore";
 import toast from "react-hot-toast";
@@ -11,12 +11,16 @@ interface Book {
   id: string;
   title: string;
   author: string;
+  authors?: string[];
   cover: string;
   rating?: number;
   reviewCount?: number;
   description?: string;
   subjects?: string[];
   mood?: string;
+  publishYear?: number;
+  publishers?: string[];
+  languages?: string[];
 }
 
 interface BookCardProps {
@@ -30,17 +34,43 @@ export function BookCard({
   showActions = true,
   size = "md",
 }: BookCardProps) {
-  const { addUserBook, userBooks } = useAppStore();
-  const [isLiked, setIsLiked] = useState(false);
+  const {
+    addUserBook,
+    userBooks,
+    likeBook,
+    unlikeBook,
+    isBookInLibrary,
+    getBookFromLibrary,
+  } = useAppStore();
+
   const [imageError, setImageError] = useState(false);
 
-  // Check if book is already in user's library
-  const isInLibrary = userBooks.some((userBook) => userBook.id === book.id);
+  // Check if book is already in user's library and if it's liked
+  const isInLibrary = isBookInLibrary(book.id);
+  const bookInLibrary = getBookFromLibrary(book.id);
+  const isLiked = bookInLibrary?.isLiked || false;
 
   const handleLike = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsLiked(!isLiked);
+
+    const bookData = {
+      title: book.title,
+      author: book.author,
+      cover: book.cover,
+      description: book.description,
+      rating: book.rating,
+      genre: book.subjects || [],
+      publishedYear: book.publishYear,
+    };
+
+    if (isLiked) {
+      unlikeBook(book.id);
+      toast.success(`Removed "${book.title}" from favorites`);
+    } else {
+      likeBook(book.id, bookData);
+      toast.success(`Added "${book.title}" to favorites`);
+    }
   };
 
   const handleAddToList = (e: React.MouseEvent) => {
@@ -65,8 +95,8 @@ export function BookCard({
       genre: book.subjects || [],
       mood: book.mood ? [book.mood] : [],
       isbn: "", // We don't have ISBN from discovery books
-      pages: 0, // We don't have page count from discovery books
-      publishedYear: new Date().getFullYear(), // Default to current year
+      pages: 0, // We don't have page count from discovery books - will be updated when viewing details
+      publishedYear: book.publishYear || new Date().getFullYear(),
     };
 
     addUserBook(userBook);
@@ -77,24 +107,27 @@ export function BookCard({
     switch (size) {
       case "sm":
         return {
-          container: "w-32",
-          image: "h-48",
+          container: "w-32 h-80", // Fixed height for consistency
+          image: "h-40", // Reduced image height to fit more content
           title: "text-sm",
           author: "text-xs",
+          info: "p-2", // Reduced padding
         };
       case "lg":
         return {
-          container: "w-48",
-          image: "h-72",
+          container: "w-48 h-96", // Fixed height for consistency
+          image: "h-64", // Adjusted image height
           title: "text-lg",
           author: "text-base",
+          info: "p-4", // Standard padding
         };
       default:
         return {
-          container: "w-40",
-          image: "h-60",
+          container: "w-40 h-88", // Fixed height for consistency
+          image: "h-52", // Adjusted image height to fit content below
           title: "text-base",
           author: "text-sm",
+          info: "p-3", // Standard padding
         };
     }
   };
@@ -103,9 +136,11 @@ export function BookCard({
 
   return (
     <Link href={`/books/${book.id}`} className="block group">
-      <div className={`book-card ${sizeClasses.container}`}>
+      <div
+        className={`book-card ${sizeClasses.container} bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 flex flex-col`}
+      >
         {/* Book Cover */}
-        <div className="relative overflow-hidden rounded-t-lg">
+        <div className="relative overflow-hidden rounded-t-lg flex-shrink-0">
           {!imageError ? (
             <img
               src={book.cover}
@@ -121,7 +156,7 @@ export function BookCard({
                 <img
                   src="/logo.png"
                   alt="BookHaven Logo"
-                  className="w-16 h-16 mx-auto mb-2 opacity-60"
+                  className="w-12 h-12 mx-auto mb-2 opacity-60"
                 />
                 <div className="text-primary-600 dark:text-primary-400 text-xs font-medium line-clamp-2">
                   {book.title}
@@ -130,17 +165,38 @@ export function BookCard({
             </div>
           )}
 
+          {/* Status Indicators */}
+          {(isInLibrary || isLiked) && (
+            <div className="absolute top-2 left-2 flex gap-1">
+              {isInLibrary && (
+                <div className="bg-green-500 text-white px-1.5 py-0.5 rounded-full text-xs font-medium">
+                  In Library
+                </div>
+              )}
+              {isLiked && (
+                <div className="bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-medium">
+                  ♥
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Hover Actions */}
           {showActions && (
             <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center space-x-2">
               <button
                 onClick={handleLike}
-                className="p-2 bg-white dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                className={`p-2 rounded-full transition-colors ${
+                  isLiked
+                    ? "bg-red-500 text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400"
+                }`}
+                title={isLiked ? "Remove from favorites" : "Add to favorites"}
               >
                 {isLiked ? (
-                  <HeartSolidIcon className="h-5 w-5 text-red-500" />
+                  <HeartSolidIcon className="h-4 w-4" />
                 ) : (
-                  <HeartIcon className="h-5 w-5" />
+                  <HeartIcon className="h-4 w-4" />
                 )}
               </button>
               <button
@@ -152,36 +208,70 @@ export function BookCard({
                 }`}
                 title={isInLibrary ? "Already in library" : "Add to library"}
               >
-                <PlusIcon className="h-5 w-5" />
+                {isInLibrary ? (
+                  <CheckIcon className="h-4 w-4" />
+                ) : (
+                  <PlusIcon className="h-4 w-4" />
+                )}
               </button>
             </div>
           )}
         </div>
 
-        {/* Book Info */}
-        <div className="p-3">
-          <h3
-            className={`${sizeClasses.title} font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-colors`}
-          >
-            {book.title}
-          </h3>
-          <p
-            className={`${sizeClasses.author} text-gray-600 dark:text-gray-400 mt-1 line-clamp-1`}
-          >
-            {book.author}
-          </p>
+        {/* Book Info - This will take remaining space */}
+        <div
+          className={`${sizeClasses.info} flex-1 flex flex-col justify-between min-h-0`}
+        >
+          <div className="flex-1">
+            <h3
+              className={`${sizeClasses.title} font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-colors leading-tight`}
+            >
+              {book.title}
+            </h3>
+            <p
+              className={`${sizeClasses.author} text-gray-600 dark:text-gray-400 mt-1 line-clamp-1`}
+            >
+              {book.author}
+            </p>
+          </div>
 
-          {book.rating && (
-            <div className="flex items-center mt-2">
-              <div className="flex text-yellow-400 text-sm">
-                {"★".repeat(Math.floor(book.rating))}
-                {"☆".repeat(5 - Math.floor(book.rating))}
+          {/* Rating and status info at bottom */}
+          <div className="mt-2 space-y-1">
+            {book.rating && (
+              <div className="flex items-center">
+                <div className="flex text-yellow-400 text-xs">
+                  {"★".repeat(Math.floor(book.rating))}
+                  {"☆".repeat(5 - Math.floor(book.rating))}
+                </div>
+                {book.reviewCount && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 truncate">
+                    (
+                    {book.reviewCount > 999
+                      ? `${Math.round(book.reviewCount / 1000)}k`
+                      : book.reviewCount}
+                    )
+                  </span>
+                )}
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-                ({book.reviewCount?.toLocaleString()})
-              </span>
-            </div>
-          )}
+            )}
+
+            {/* User interaction status */}
+            {bookInLibrary && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                <div className="truncate">
+                  Status:{" "}
+                  <span className="capitalize">
+                    {bookInLibrary.status.replace("-", " ")}
+                  </span>
+                </div>
+                {bookInLibrary.userRating && (
+                  <div className="truncate">
+                    Your rating: {bookInLibrary.userRating}/5 ⭐
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Link>

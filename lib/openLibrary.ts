@@ -45,7 +45,8 @@ export class OpenLibraryAPI {
   static async searchBooks(
     query: string,
     limit: number = 20,
-    offset: number = 0
+    offset: number = 0,
+    sortBy: string = "relevance"
   ): Promise<BookSearchResponse> {
     const searchParams = new URLSearchParams({
       q: query,
@@ -54,6 +55,23 @@ export class OpenLibraryAPI {
       fields:
         "key,title,author_name,first_publish_year,isbn,cover_i,publisher,language,subject,ratings_average,ratings_count,want_to_read_count,currently_reading_count,already_read_count",
     });
+
+    // Add sort parameter if not relevance
+    if (sortBy !== "relevance") {
+      const sortMap: { [key: string]: string } = {
+        title_asc: "title asc",
+        title_desc: "title desc",
+        year_newest: "new",
+        year_oldest: "old",
+        rating_highest: "rating desc",
+        popularity_highest: "want_to_read_count desc",
+      };
+
+      const sortValue = sortMap[sortBy];
+      if (sortValue) {
+        searchParams.append("sort", sortValue);
+      }
+    }
 
     const response = await fetch(
       `${OPEN_LIBRARY_BASE_URL}/search.json?${searchParams}`
@@ -95,7 +113,7 @@ export class OpenLibraryAPI {
     limit: number = 20,
     offset: number = 0
   ): Promise<BookSearchResponse> {
-    return this.searchBooks(`subject:"${genre}"`, limit, offset);
+    return this.searchBooks(`subject:"${genre}"`, limit, offset, "relevance");
   }
 
   static async searchByAuthor(
@@ -103,18 +121,18 @@ export class OpenLibraryAPI {
     limit: number = 20,
     offset: number = 0
   ): Promise<BookSearchResponse> {
-    return this.searchBooks(`author:"${author}"`, limit, offset);
+    return this.searchBooks(`author:"${author}"`, limit, offset, "relevance");
   }
 
   static async searchByISBN(isbn: string): Promise<BookSearchResponse> {
-    return this.searchBooks(`isbn:${isbn}`, 1, 0);
+    return this.searchBooks(`isbn:${isbn}`, 1, 0, "relevance");
   }
 
   static async getTrendingBooks(
     limit: number = 20
   ): Promise<BookSearchResponse> {
     // Use a search for popular books (this is a simplified approach)
-    return this.searchBooks("*", limit, 0);
+    return this.searchBooks("*", limit, 0, "popularity_highest");
   }
 
   static async getPopularBooksByGenre(

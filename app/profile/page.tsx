@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   StarIcon,
   HeartIcon,
@@ -10,6 +11,7 @@ import {
   BookOpenIcon,
   UserIcon,
   Cog6ToothIcon,
+  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import {
   HeartIcon as HeartSolidIcon,
@@ -17,6 +19,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { PersonalizedRecommendations } from "../../components/home/PersonalizedRecommendations";
+import { useAppStore, UserBook } from "../../stores/useAppStore";
 import toast from "react-hot-toast";
 
 interface UserData {
@@ -48,8 +51,17 @@ export default function ProfilePage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "preferences" | "ratings"
+    "overview" | "preferences" | "ratings" | "library"
   >("overview");
+
+  // Get data from app store
+  const {
+    userBooks,
+    userPreferences,
+    bookRatings,
+    authorRatings,
+    hasCompletedOnboarding,
+  } = useAppStore();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -58,9 +70,38 @@ export default function ProfilePage() {
     }
 
     if (session?.user?.email) {
-      fetchUserData();
+      // Use local store data if available, otherwise fetch from API
+      if (hasCompletedOnboarding && userPreferences) {
+        setUserData({
+          preferences: userPreferences,
+          ratings: {
+            books: bookRatings.map((rating) => ({
+              id: rating.bookId,
+              title: rating.title,
+              author: rating.author,
+              rating: rating.rating,
+            })),
+            authors: authorRatings.map((rating) => ({
+              id: rating.id,
+              name: rating.authorName,
+              rating: rating.rating,
+            })),
+          },
+        });
+        setLoading(false);
+      } else {
+        fetchUserData();
+      }
     }
-  }, [session, status, router]);
+  }, [
+    session,
+    status,
+    router,
+    hasCompletedOnboarding,
+    userPreferences,
+    bookRatings,
+    authorRatings,
+  ]);
 
   const fetchUserData = async () => {
     try {
@@ -122,7 +163,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 py-8">
         {/* Profile Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-center space-x-4">
@@ -162,6 +203,17 @@ export default function ProfilePage() {
                 Overview
               </button>
               <button
+                onClick={() => setActiveTab("library")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === "library"
+                    ? "border-purple-500 text-purple-600 dark:text-purple-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
+              >
+                <BookOpenIcon className="w-5 h-5 inline mr-2" />
+                Library ({userBooks.length})
+              </button>
+              <button
                 onClick={() => setActiveTab("preferences")}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === "preferences"
@@ -188,18 +240,31 @@ export default function ProfilePage() {
 
           <div className="p-6">
             {/* Overview Tab */}
-            {activeTab === "overview" && userData && (
+            {activeTab === "overview" && (
               <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="bg-purple-50 dark:bg-purple-900 rounded-lg p-4">
                     <div className="flex items-center">
-                      <StarSolidIcon className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                      <BookOpenIcon className="w-8 h-8 text-purple-600 dark:text-purple-400" />
                       <div className="ml-3">
                         <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                          {userData.ratings.books.length}
+                          {userBooks.length}
                         </p>
                         <p className="text-purple-800 dark:text-purple-200">
-                          Books Rated
+                          Books in Library
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <StarSolidIcon className="w-8 h-8 text-green-600 dark:text-green-400" />
+                      <div className="ml-3">
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {userBooks.filter((b) => b.status === "read").length}
+                        </p>
+                        <p className="text-green-800 dark:text-green-200">
+                          Books Read
                         </p>
                       </div>
                     </div>
@@ -209,10 +274,10 @@ export default function ProfilePage() {
                       <HeartSolidIcon className="w-8 h-8 text-red-600 dark:text-red-400" />
                       <div className="ml-3">
                         <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                          {userData.ratings.authors.length}
+                          {userBooks.filter((b) => b.isLiked).length}
                         </p>
                         <p className="text-red-800 dark:text-red-200">
-                          Authors Liked
+                          Favorite Books
                         </p>
                       </div>
                     </div>
@@ -222,7 +287,9 @@ export default function ProfilePage() {
                       <BookOpenIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                       <div className="ml-3">
                         <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                          {userData.preferences.genres.length}
+                          {userData?.preferences?.genres?.length ||
+                            userPreferences?.genres?.length ||
+                            0}
                         </p>
                         <p className="text-blue-800 dark:text-blue-200">
                           Favorite Genres
@@ -232,24 +299,94 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
+                {/* Recent Activity */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Your Favorite Genres
+                    Recent Activity
                   </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {userData.preferences.genres.map((genre) => (
-                      <span
-                        key={genre}
-                        className="px-3 py-1 bg-purple-100 dark:bg-purple-800 text-purple-800 dark:text-purple-200 rounded-full text-sm"
-                      >
-                        {genre}
-                      </span>
-                    ))}
+                  <div className="space-y-3">
+                    {userBooks
+                      .sort(
+                        (a, b) =>
+                          new Date(b.dateAdded).getTime() -
+                          new Date(a.dateAdded).getTime()
+                      )
+                      .slice(0, 5)
+                      .map((book) => (
+                        <div
+                          key={book.id}
+                          className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                        >
+                          <img
+                            src={book.cover}
+                            alt={book.title}
+                            className="w-12 h-16 object-cover rounded"
+                          />
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 dark:text-white">
+                              {book.title}
+                            </h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              by {book.author}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              Added{" "}
+                              {new Date(book.dateAdded).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span
+                              className={`px-2 py-1 text-xs rounded-full ${
+                                book.status === "read"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                                  : book.status === "currently-reading"
+                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                                  : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
+                              }`}
+                            >
+                              {book.status === "want-to-read"
+                                ? "Want to Read"
+                                : book.status === "currently-reading"
+                                ? "Reading"
+                                : "Read"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    {userBooks.length === 0 && (
+                      <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                        No books in your library yet. Start discovering books to
+                        add them!
+                      </p>
+                    )}
                   </div>
                 </div>
 
+                {userData?.preferences?.genres && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      Your Favorite Genres
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {userData.preferences.genres.map((genre) => (
+                        <span
+                          key={genre}
+                          className="px-3 py-1 bg-purple-100 dark:bg-purple-800 text-purple-800 dark:text-purple-200 rounded-full text-sm"
+                        >
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <PersonalizedRecommendations limit={4} />
               </div>
+            )}
+
+            {/* Library Tab */}
+            {activeTab === "library" && (
+              <LibraryDisplay userBooks={userBooks} />
             )}
 
             {/* Preferences Tab */}
@@ -267,6 +404,187 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Library Display Component
+interface LibraryDisplayProps {
+  userBooks: UserBook[];
+}
+
+function LibraryDisplay({ userBooks }: LibraryDisplayProps) {
+  const [filter, setFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<
+    "dateAdded" | "title" | "author" | "rating"
+  >("dateAdded");
+
+  const filteredBooks = userBooks.filter((book) => {
+    if (filter === "all") return true;
+    if (filter === "liked") return book.isLiked;
+    return book.status === filter;
+  });
+
+  const sortedBooks = [...filteredBooks].sort((a, b) => {
+    switch (sortBy) {
+      case "title":
+        return a.title.localeCompare(b.title);
+      case "author":
+        return a.author.localeCompare(b.author);
+      case "rating":
+        return (b.userRating || 0) - (a.userRating || 0);
+      case "dateAdded":
+      default:
+        return (
+          new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
+        );
+    }
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Filter and Sort Controls */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "all", label: "All Books" },
+            { key: "want-to-read", label: "Want to Read" },
+            { key: "currently-reading", label: "Reading" },
+            { key: "read", label: "Read" },
+            { key: "liked", label: "Favorites" },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                filter === key
+                  ? "bg-purple-600 text-white dark:bg-purple-500"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as any)}
+          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+        >
+          <option value="dateAdded">Sort by Date Added</option>
+          <option value="title">Sort by Title</option>
+          <option value="author">Sort by Author</option>
+          <option value="rating">Sort by Rating</option>
+        </select>
+      </div>
+
+      {/* Books Count */}
+      <div className="text-sm text-gray-600 dark:text-gray-400">
+        Showing {sortedBooks.length} of {userBooks.length} books
+      </div>
+
+      {/* Books Grid */}
+      {sortedBooks.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {sortedBooks.map((book) => (
+            <div
+              key={book.id}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+            >
+              <div className="relative group">
+                <img
+                  src={book.cover}
+                  alt={book.title}
+                  className="w-full h-64 object-cover"
+                />
+                <div className="absolute top-2 right-2 flex gap-1">
+                  {book.isLiked && (
+                    <HeartSolidIcon className="w-5 h-5 text-red-500" />
+                  )}
+                  {book.status === "read" && (
+                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">
+                  {book.title}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  by {book.author}
+                </p>
+
+                {book.userRating && (
+                  <div className="flex items-center gap-1 mb-2">
+                    {[...Array(5)].map((_, i) => (
+                      <StarSolidIcon
+                        key={i}
+                        className={`w-4 h-4 ${
+                          i < book.userRating!
+                            ? "text-yellow-400"
+                            : "text-gray-300 dark:text-gray-600"
+                        }`}
+                      />
+                    ))}
+                    <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
+                      {book.userRating}/5
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full ${
+                      book.status === "read"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                        : book.status === "currently-reading"
+                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                        : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
+                    }`}
+                  >
+                    {book.status === "want-to-read"
+                      ? "Want to Read"
+                      : book.status === "currently-reading"
+                      ? "Reading"
+                      : "Read"}
+                  </span>
+
+                  <Link
+                    href={`/books/${book.id}`}
+                    className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 text-sm font-medium"
+                  >
+                    View Details
+                  </Link>
+                </div>
+
+                <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                  Added {new Date(book.dateAdded).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <BookOpenIcon className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            No books found
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            {filter === "all"
+              ? "You haven't added any books to your library yet."
+              : `You don't have any books in the "${filter}" category.`}
+          </p>
+          <Link
+            href="/explore"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
+          >
+            Discover Books
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

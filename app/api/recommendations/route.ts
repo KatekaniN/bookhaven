@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get("limit") || "20");
+    const refresh = url.searchParams.get("refresh") === "true";
     const userEmail = session.user.email;
 
     // In a real app, you would fetch user preferences from database
@@ -27,7 +28,8 @@ export async function GET(request: NextRequest) {
 
     const recommendations = await generateRecommendations(
       userPreferences,
-      limit
+      limit,
+      refresh
     );
 
     return NextResponse.json({
@@ -60,7 +62,11 @@ function getUserPreferences(userEmail: string) {
 }
 
 // Simple recommendation algorithm
-async function generateRecommendations(preferences: any, limit: number) {
+async function generateRecommendations(
+  preferences: any,
+  limit: number,
+  refresh: boolean = false
+) {
   const recommendations: Array<
     OpenLibraryBook & {
       recommendation_score: number;
@@ -68,15 +74,30 @@ async function generateRecommendations(preferences: any, limit: number) {
     }
   > = [];
 
+  // Add some randomization when refreshing
+  const genresToUse = refresh
+    ? [...preferences.genres].sort(() => Math.random() - 0.5) // Randomize genre order
+    : preferences.genres;
+
   // Generate recommendations based on preferred genres
-  for (const genre of preferences.genres.slice(0, 3)) {
+  for (const genre of genresToUse.slice(0, 3)) {
     try {
-      const searchResult = await OpenLibraryAPI.searchByGenre(genre, 5);
-      const books = searchResult.docs;
+      // Vary the number of books fetched and add randomness for refresh
+      const booksToFetch = refresh ? Math.floor(Math.random() * 10) + 5 : 5;
+      const searchResult = await OpenLibraryAPI.searchByGenre(
+        genre,
+        booksToFetch
+      );
+      let books = searchResult.docs;
+
+      // If refreshing, randomize the book selection
+      if (refresh) {
+        books = books.sort(() => Math.random() - 0.5);
+      }
 
       books.forEach((book: OpenLibraryBook) => {
-        // Simple scoring algorithm
-        let score = 0.5; // Base score
+        // Simple scoring algorithm with randomization for refresh
+        let score = refresh ? Math.random() * 0.3 + 0.4 : 0.5; // Base score with variation
 
         // Boost score for preferred genres
         if (
@@ -86,7 +107,7 @@ async function generateRecommendations(preferences: any, limit: number) {
             )
           )
         ) {
-          score += 0.3;
+          score += refresh ? Math.random() * 0.4 + 0.2 : 0.3;
         }
 
         // Boost score for favorite authors
@@ -97,7 +118,7 @@ async function generateRecommendations(preferences: any, limit: number) {
             )
           )
         ) {
-          score += 0.4;
+          score += refresh ? Math.random() * 0.5 + 0.3 : 0.4;
         }
 
         // Reduce score for disliked genres
@@ -108,7 +129,7 @@ async function generateRecommendations(preferences: any, limit: number) {
             )
           )
         ) {
-          score -= 0.2;
+          score -= refresh ? Math.random() * 0.3 + 0.1 : 0.2;
         }
 
         recommendations.push({
@@ -123,12 +144,18 @@ async function generateRecommendations(preferences: any, limit: number) {
   }
 
   // Sort by recommendation score and remove duplicates
-  const uniqueRecommendations = recommendations
+  let uniqueRecommendations = recommendations
     .filter(
       (book, index, self) => index === self.findIndex((b) => b.key === book.key)
     )
-    .sort((a, b) => b.recommendation_score - a.recommendation_score)
-    .slice(0, limit);
+    .sort((a, b) => b.recommendation_score - a.recommendation_score);
 
-  return uniqueRecommendations;
+  // If refreshing, add some randomization to the final selection
+  if (refresh) {
+    uniqueRecommendations = uniqueRecommendations.sort(
+      () => Math.random() - 0.5
+    );
+  }
+
+  return uniqueRecommendations.slice(0, limit);
 }
