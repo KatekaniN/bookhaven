@@ -21,17 +21,33 @@ const withPWA = require("next-pwa")({
 
 const nextConfig = {
   images: {
-    domains: [
-      "covers.openlibrary.org",
-      "archive.org",
-      "lh3.googleusercontent.com",
-      "avatars.githubusercontent.com",
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "covers.openlibrary.org",
+      },
+      {
+        protocol: "https",
+        hostname: "archive.org",
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "avatars.githubusercontent.com",
+      },
     ],
   },
-  env: {
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+  // Optimize for production
+  experimental: {
+    optimizeCss: true,
   },
+  // Enable compression
+  compress: true,
+  // Generate static files when possible
+  output: "standalone",
 };
 
 module.exports = withPWA(nextConfig);

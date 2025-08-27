@@ -7,6 +7,8 @@ import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { useAppStore } from "../../stores/useAppStore";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { OpenLibraryAPI } from "../../lib/openLibrary";
+import { useUserPreferences, UserData } from "../../hooks/useUserPreferences";
+import { useSession } from "next-auth/react";
 import {
   MagnifyingGlassIcon,
   SparklesIcon,
@@ -14,6 +16,19 @@ import {
   ClockIcon,
   Bars3BottomLeftIcon,
   XMarkIcon,
+  HomeIcon,
+  BoltIcon,
+  HeartIcon,
+  SunIcon,
+  MoonIcon,
+  BookOpenIcon,
+  RocketLaunchIcon,
+  ChatBubbleBottomCenterTextIcon,
+  AcademicCapIcon,
+  CursorArrowRaysIcon,
+  StarIcon,
+  CalendarIcon,
+  LanguageIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 
@@ -22,11 +37,12 @@ interface Book {
   title: string;
   author: string;
   cover: string;
-  rating: number;
+  likelihoodScore: number; // 0-100 percentage likelihood user will like this book
   reviewCount: number;
   subjects: string[];
   mood: string;
   description: string;
+  publishYear?: number;
 }
 
 const genres = [
@@ -53,46 +69,40 @@ const genres = [
 const moods = [
   {
     name: "Cozy & Comfortable",
-    icon: "☕",
-    emoji: "🏠",
+    icon: HomeIcon,
     color:
       "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
     description: "Perfect for quiet evenings",
   },
   {
     name: "Fast-paced & Exciting",
-    icon: "⚡",
-    emoji: "🚀",
+    icon: RocketLaunchIcon,
     color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
     description: "Action-packed adventures",
   },
   {
     name: "Emotional & Deep",
-    icon: "💙",
-    emoji: "💭",
+    icon: HeartIcon,
     color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
     description: "Thought-provoking reads",
   },
   {
     name: "Light & Fun",
-    icon: "🌟",
-    emoji: "😊",
+    icon: SunIcon,
     color:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
     description: "Easy, enjoyable reads",
   },
   {
     name: "Dark & Mysterious",
-    icon: "🌙",
-    emoji: "🔍",
+    icon: MoonIcon,
     color:
       "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
     description: "Intriguing mysteries",
   },
   {
     name: "Educational",
-    icon: "📚",
-    emoji: "🎓",
+    icon: AcademicCapIcon,
     color:
       "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
     description: "Learn something new",
@@ -100,11 +110,11 @@ const moods = [
 ];
 
 const sortOptions = [
-  { value: "relevance", label: "Most Relevant", icon: "🎯" },
-  { value: "rating", label: "Highest Rated", icon: "⭐" },
-  { value: "new", label: "Newest First", icon: "🆕" },
-  { value: "old", label: "Oldest First", icon: "📚" },
-  { value: "title", label: "Title A-Z", icon: "🔤" },
+  { value: "relevance", label: "Most Relevant", icon: CursorArrowRaysIcon },
+  { value: "rating", label: "Best Match", icon: StarIcon },
+  { value: "new", label: "Newest First", icon: CalendarIcon },
+  { value: "old", label: "Oldest First", icon: BookOpenIcon },
+  { value: "title", label: "Title A-Z", icon: LanguageIcon },
 ];
 
 // Enhanced fetch function combining both search and discovery
@@ -114,7 +124,8 @@ const fetchBooks = async (
   selectedMood: string = "",
   sortBy: string = "relevance",
   page: number = 1,
-  limit: number = 24
+  limit: number = 24,
+  calculateLikelihood?: (book: any, subjects: string[], mood: string) => number
 ): Promise<Book[]> => {
   try {
     const allBooks: Book[] = [];
@@ -130,7 +141,7 @@ const fetchBooks = async (
       if (searchResult.docs) {
         const searchBooks = searchResult.docs
           .filter((book) => book.cover_i && book.author_name?.[0] && book.title)
-          .map((book) => formatBookData(book));
+          .map((book) => formatBookData(book, calculateLikelihood));
         allBooks.push(...searchBooks);
       }
     } else {
@@ -162,7 +173,9 @@ const fetchBooks = async (
       });
 
       const results = await Promise.all(bookPromises);
-      const discoveryBooks = results.flat().map((book) => formatBookData(book));
+      const discoveryBooks = results
+        .flat()
+        .map((book) => formatBookData(book, calculateLikelihood));
       allBooks.push(...discoveryBooks);
     }
 
@@ -192,6 +205,26 @@ const fetchBooks = async (
         )
     );
 
+    // Apply client-side sorting
+    uniqueBooks.sort((a, b) => {
+      switch (sortBy) {
+        case "rating":
+          return (b.likelihoodScore || 0) - (a.likelihoodScore || 0);
+        case "new":
+          // Sort by publication year (newer first)
+          return (b.publishYear || 0) - (a.publishYear || 0);
+        case "old":
+          // Sort by publication year (older first)
+          return (a.publishYear || 0) - (b.publishYear || 0);
+        case "title":
+          return a.title.localeCompare(b.title);
+        case "relevance":
+        default:
+          // Keep original order for relevance (API already sorted by relevance)
+          return 0;
+      }
+    });
+
     return uniqueBooks.slice(0, limit);
   } catch (error) {
     console.error("Error fetching books:", error);
@@ -199,43 +232,51 @@ const fetchBooks = async (
   }
 };
 
-const formatBookData = (book: any): Book => {
+const formatBookData = (
+  book: any,
+  calculateLikelihood?: (book: any, subjects: string[], mood: string) => number
+): Book => {
   const primarySubject = book.subject?.[0] || "Fiction";
 
   // Enhanced mood detection
   let mood = "Educational";
   const subjects = book.subject?.map((s: string) => s.toLowerCase()) || [];
 
-  if (subjects.some((s) => s.includes("romance") || s.includes("love"))) {
+  if (
+    subjects.some((s: string) => s.includes("romance") || s.includes("love"))
+  ) {
     mood = "Emotional & Deep";
   } else if (
     subjects.some(
-      (s) =>
+      (s: string) =>
         s.includes("thriller") || s.includes("mystery") || s.includes("crime")
     )
   ) {
     mood = "Dark & Mysterious";
   } else if (
     subjects.some(
-      (s) => s.includes("comedy") || s.includes("humor") || s.includes("funny")
+      (s: string) =>
+        s.includes("comedy") || s.includes("humor") || s.includes("funny")
     )
   ) {
     mood = "Light & Fun";
   } else if (
     subjects.some(
-      (s) =>
+      (s: string) =>
         s.includes("science") || s.includes("adventure") || s.includes("action")
     )
   ) {
     mood = "Fast-paced & Exciting";
   } else if (
     subjects.some(
-      (s) =>
+      (s: string) =>
         s.includes("fantasy") || s.includes("cozy") || s.includes("comfort")
     )
   ) {
     mood = "Cozy & Comfortable";
   }
+
+  const bookSubjects = book.subject?.slice(0, 3) || [primarySubject];
 
   return {
     id: book.key || `book_${Math.random()}`,
@@ -244,18 +285,26 @@ const formatBookData = (book: any): Book => {
     cover: book.cover_i
       ? OpenLibraryAPI.getCoverUrl(book.cover_i, "M")
       : "/placeholder-book.jpg",
-    rating: 3.5 + Math.random() * 1.5,
+    likelihoodScore: calculateLikelihood
+      ? calculateLikelihood(book, bookSubjects, mood)
+      : Math.floor(Math.random() * 35) + 60,
     reviewCount: Math.floor(Math.random() * 50000) + 1000,
-    subjects: book.subject?.slice(0, 3) || [primarySubject],
+    subjects: bookSubjects,
     mood,
     description:
       book.first_sentence?.[0] || `An engaging ${mood.toLowerCase()} book.`,
+    publishYear:
+      book.first_publish_year ||
+      book.publish_year?.[0] ||
+      2000 + Math.floor(Math.random() * 24), // Use actual year or generate reasonable fallback
   };
 };
 
 export default function SearchDiscoverPage() {
   const searchParams = useSearchParams();
   const { addUserBook, clearOldDiscoverBooks } = useAppStore();
+  const { data: session } = useSession();
+  const { userData } = useUserPreferences();
 
   // State management
   const [searchQuery, setSearchQuery] = useState(searchParams?.get("q") || "");
@@ -271,6 +320,85 @@ export default function SearchDiscoverPage() {
   const [isSearchMode, setIsSearchMode] = useState(!!searchParams?.get("q"));
 
   const booksPerPage = 24;
+
+  // Calculate likelihood score based on user preferences
+  const calculateLikelihoodScore = (
+    book: any,
+    bookSubjects: string[],
+    mood: string
+  ): number => {
+    if (!userData) {
+      // If no user data, return random score between 60-95
+      return Math.floor(Math.random() * 35) + 60;
+    }
+
+    let score = 50; // Base score
+
+    // Genre/Subject matching (40% weight)
+    const userGenres = userData.preferences?.genres || [];
+    const genreMatches = bookSubjects.filter((subject) =>
+      userGenres.some(
+        (userGenre) =>
+          subject.toLowerCase().includes(userGenre.toLowerCase()) ||
+          userGenre.toLowerCase().includes(subject.toLowerCase())
+      )
+    ).length;
+
+    if (genreMatches > 0) {
+      score += Math.min(genreMatches * 10, 40); // Max 40 points for genres
+    }
+
+    // Author preference (20% weight)
+    const userAuthorRatings = userData.ratings?.authors || [];
+    const authorMatch = userAuthorRatings.find(
+      (a) =>
+        a.name
+          .toLowerCase()
+          .includes(book.author_name?.[0]?.toLowerCase() || "") ||
+        (book.author_name?.[0]?.toLowerCase() || "").includes(
+          a.name.toLowerCase()
+        )
+    );
+    if (authorMatch) {
+      score += (authorMatch.rating - 3) * 10; // Convert 1-5 rating to -20 to +20 points
+    }
+
+    // Book rating history (20% weight)
+    const userBookRatings = userData.ratings?.books || [];
+    if (userBookRatings.length > 0) {
+      const avgUserRating =
+        userBookRatings.reduce((sum, book) => sum + book.rating, 0) /
+        userBookRatings.length;
+      const ratingBonus = (avgUserRating - 3) * 5; // Convert average to bonus/penalty
+      score += ratingBonus;
+    }
+
+    // Topic/Interest matching (10% weight)
+    const userTopics = userData.preferences?.topics || [];
+    const topicMatches = userTopics.filter(
+      (topic) =>
+        bookSubjects.some((subject) =>
+          subject.toLowerCase().includes(topic.toLowerCase())
+        ) || mood.toLowerCase().includes(topic.toLowerCase())
+    ).length;
+
+    if (topicMatches > 0) {
+      score += Math.min(topicMatches * 5, 10); // Max 10 points for topics
+    }
+
+    // Publication year preference (10% weight)
+    const currentYear = new Date().getFullYear();
+    const bookYear = book.first_publish_year || book.publish_year?.[0];
+    if (bookYear) {
+      const yearDiff = currentYear - bookYear;
+      if (yearDiff <= 5) score += 10; // Recent books get bonus
+      else if (yearDiff <= 10) score += 5;
+      else if (yearDiff > 50) score += 5; // Classic books get small bonus
+    }
+
+    // Ensure score stays within 0-100 range
+    return Math.max(0, Math.min(100, Math.round(score)));
+  };
 
   // Auto-refresh for discovery mode
   const { manualRefresh, getFormattedTimeUntilNext } = useAutoRefresh({
@@ -291,7 +419,8 @@ export default function SearchDiscoverPage() {
         selectedMood,
         selectedSort,
         1,
-        booksPerPage * 2 // Load more initially
+        booksPerPage * 2, // Load more initially
+        calculateLikelihoodScore
       );
 
       setAllBooks(books);
@@ -313,7 +442,20 @@ export default function SearchDiscoverPage() {
   // Search handler
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    setIsSearchMode(!!searchQuery.trim());
+    const isEnteringSearchMode = !!searchQuery.trim();
+    const wasInSearchMode = isSearchMode;
+
+    setIsSearchMode(isEnteringSearchMode);
+
+    // Auto-adjust sort based on search mode
+    if (isEnteringSearchMode && !wasInSearchMode) {
+      // Entering search mode - default to newest first
+      setSelectedSort("new");
+    } else if (!isEnteringSearchMode && wasInSearchMode) {
+      // Exiting search mode - reset to relevance
+      setSelectedSort("relevance");
+    }
+
     await loadBooks();
   };
 
@@ -479,8 +621,8 @@ export default function SearchDiscoverPage() {
                       : "border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-600 bg-white dark:bg-gray-800"
                   }`}
                 >
-                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">
-                    {mood.emoji}
+                  <div className="flex justify-center mb-2 group-hover:scale-110 transition-transform">
+                    <mood.icon className="h-8 w-8 text-secondary-600 dark:text-secondary-400" />
                   </div>
                   <div className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
                     {mood.name}
@@ -534,7 +676,7 @@ export default function SearchDiscoverPage() {
                         : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                     }`}
                   >
-                    <span className="text-lg">{option.icon}</span>
+                    <option.icon className="h-5 w-5 text-secondary-600 dark:text-secondary-400" />
                     <span className="font-medium">{option.label}</span>
                   </button>
                 ))}
@@ -614,15 +756,12 @@ export default function SearchDiscoverPage() {
                           author: book.author,
                           authors: [book.author],
                           cover: book.cover,
-                          rating: book.rating,
+                          likelihoodScore: book.likelihoodScore,
+                          publishYear: book.publishYear,
                           reviewCount: book.reviewCount,
                           subjects: book.subjects,
-                          publishers: [],
-                          languages: [],
-                          publishYear: undefined,
-                          wantToReadCount: undefined,
-                          currentlyReadingCount: undefined,
-                          alreadyReadCount: undefined,
+                          mood: book.mood,
+                          description: book.description,
                         }}
                       />
                     </div>

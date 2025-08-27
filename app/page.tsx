@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useAppStore, useHydratedStore } from "../stores/useAppStore";
@@ -22,11 +22,25 @@ export default function HomePage() {
   );
   const hasHydrated = useHydratedStore();
 
+  // Add a delay to ensure OnboardingDataSync has time to check server state
+  const [hasInitialized, setHasInitialized] = useState(false);
+
   useEffect(() => {
     if (status === "loading" || !hasHydrated) return; // Wait for session and hydration
 
     // Clear old discover books from cache
     clearOldDiscoverBooks();
+
+    // Give OnboardingDataSync component time to check server state
+    const timer = setTimeout(() => {
+      setHasInitialized(true);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [status, hasHydrated, clearOldDiscoverBooks]);
+
+  useEffect(() => {
+    if (!hasInitialized || status === "loading" || !hasHydrated) return;
 
     if (!session) {
       router.push("/auth/signin");
@@ -34,12 +48,20 @@ export default function HomePage() {
     }
 
     if (!hasCompletedOnboarding) {
+      console.log("User has not completed onboarding, redirecting...");
       router.push("/onboarding");
       return;
     }
-  }, [session, status, hasCompletedOnboarding, router, hasHydrated]);
+  }, [
+    session,
+    hasCompletedOnboarding,
+    router,
+    hasInitialized,
+    status,
+    hasHydrated,
+  ]);
 
-  if (status === "loading" || !hasHydrated) {
+  if (status === "loading" || !hasHydrated || !hasInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

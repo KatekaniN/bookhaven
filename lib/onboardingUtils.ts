@@ -3,6 +3,9 @@ interface OnboardingData {
     genres: string[];
     topics: string[];
     languages: string[];
+    readingGoal?: number;
+    readingPace?: string;
+    bookFormats?: string[];
   };
   bookRatings: any[];
   authorRatings: any[];
@@ -55,10 +58,32 @@ export const saveOnboardingDataToAPI = async (data: OnboardingData) => {
   }
 };
 
-export const hasCompletedOnboarding = (): boolean => {
-  if (typeof window === "undefined") return false;
+export const fetchUserPreferences = async () => {
+  try {
+    const response = await fetch("/api/user/preferences", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
-  // Check if onboarding was completed (either stored locally or in API)
-  const stored = getStoredOnboardingData();
-  return stored !== null;
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Unauthorized");
+      }
+      throw new Error("Failed to fetch preferences");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching user preferences:", error);
+    throw error;
+  }
+};
+
+export const hasCompletedOnboarding = (): boolean => {
+  console.warn(
+    "hasCompletedOnboarding function is deprecated. Use Zustand store instead."
+  );
+  return false;
 };

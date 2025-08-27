@@ -221,7 +221,33 @@ export default function OnboardingPage() {
         authorRatings,
       });
 
-      // Mark onboarding as completed in Zustand store FIRST
+      // Save to API FIRST to ensure data persistence
+      if (session?.user?.email) {
+        console.log("Saving onboarding data to API...");
+
+        const onboardingData = {
+          preferences,
+          bookRatings: data.bookRatings,
+          authorRatings: data.authorRatings,
+          completedAt: new Date().toISOString(),
+        };
+
+        const response = await fetch("/api/user/preferences", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(onboardingData),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to save preferences to server");
+        }
+
+        console.log("Successfully saved to API");
+      }
+
+      // Mark onboarding as completed in Zustand store AFTER successful API save
       onboarding.complete(preferences, bookRatings, authorRatings);
 
       // Add rated books to user's library
@@ -272,8 +298,8 @@ export default function OnboardingPage() {
             cover: bookCovers[bookIndex],
             description:
               "Book rated during onboarding - added to your reading history",
-            pages: 300 + Math.floor(Math.random() * 200), // Random page count 300-500
-            publishedYear: 2018 + Math.floor(Math.random() * 6), // Random year 2018-2023
+            pages: 300 + Math.floor(Math.random() * 200),
+            publishedYear: 2018 + Math.floor(Math.random() * 6),
             genre: data.favoriteGenres.slice(0, 2),
             mood: ["Engaging", "Thoughtful"],
             isbn: "",
@@ -305,45 +331,15 @@ export default function OnboardingPage() {
         }`
       );
 
-      // Try to save to API if authenticated (but don't block the flow)
-      if (session?.user?.email) {
-        console.log("User is authenticated, saving to API in background...");
-
-        const onboardingData = {
-          preferences,
-          bookRatings: data.bookRatings,
-          authorRatings: data.authorRatings,
-          completedAt: new Date().toISOString(),
-        };
-
-        fetch("/api/user/preferences", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(onboardingData),
-        })
-          .then((response) => {
-            if (response.ok) {
-              console.log("Preferences saved to API successfully");
-            } else {
-              console.error(
-                "Failed to save to API, but onboarding is still complete"
-              );
-            }
-          })
-          .catch((error) => {
-            console.error("API save error:", error);
-          });
-      }
-
-      console.log("Redirecting to home page...");
+      console.log(
+        "Onboarding completed successfully, redirecting to home page..."
+      );
 
       // Redirect immediately
       router.push("/");
     } catch (error) {
       console.error("Error completing onboarding:", error);
-      toast.error("Something went wrong. Please try again.");
+      toast.error("Failed to save your preferences. Please try again.");
       setIsLoading(false); // Only set loading to false on error
     }
     // Note: Don't set isLoading to false on success, let the redirect handle it

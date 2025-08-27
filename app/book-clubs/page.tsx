@@ -515,7 +515,10 @@ export default function BookClubsPage() {
             )}
 
             {/* Create Button - Only show when there are items to display, or when search/filter is active */}
-            {((activeTab === "clubs" && (filteredClubs.length > 0 || searchQuery || selectedCategory !== "all")) ||
+            {((activeTab === "clubs" &&
+              (filteredClubs.length > 0 ||
+                searchQuery ||
+                selectedCategory !== "all")) ||
               (activeTab === "buddy-reads" && buddyReads.length > 0) ||
               (activeTab === "my-clubs" && myClubs.length > 0)) && (
               <button
@@ -529,7 +532,9 @@ export default function BookClubsPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors whitespace-nowrap"
               >
                 <PlusIcon className="h-4 w-4" />
-                {activeTab === "buddy-reads" ? "Start Buddy Read" : "Create Club"}
+                {activeTab === "buddy-reads"
+                  ? "Start Buddy Read"
+                  : "Create Club"}
               </button>
             )}
           </div>
@@ -1328,10 +1333,10 @@ function ClubDiscussionView({ club, onClose }: ClubDiscussionViewProps) {
     } else {
       // For all other clubs (including newly created ones), start with empty discussion
       // or just a welcome message from the club creator
-      const welcomeMessage = club.currentBook 
+      const welcomeMessage = club.currentBook
         ? `Welcome to ${club.name}! Let's discuss "${club.currentBook.title}" by ${club.currentBook.author}. Feel free to share your thoughts and questions here.`
         : `Welcome to ${club.name}! I'm excited to start our reading journey together. Feel free to share book recommendations, thoughts, and questions here.`;
-      
+
       return [
         {
           id: "welcome",

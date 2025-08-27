@@ -7,6 +7,7 @@ import { AuthGuard } from "../components/auth/AuthGuard";
 import OnboardingDataSync from "../components/auth/OnboardingDataSync";
 import DataMigration from "../components/utils/DataMigration";
 import { SessionDebug } from "../components/debug/SessionDebug";
+import { OnboardingDebug } from "../components/debug/OnboardingDebug";
 import { CustomCursor } from "../components/ui/CustomCursor";
 import { Toaster } from "react-hot-toast";
 
@@ -21,6 +22,19 @@ export const metadata: Metadata = {
   keywords: ["books", "reading", "reviews", "book club", "social reading"],
   authors: [{ name: "BookHaven Team" }],
   creator: "Book Haven",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any", type: "image/x-icon" },
+      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/favicon.ico", sizes: "16x16", type: "image/x-icon" },
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/icons/icon-152x152.png", sizes: "152x152", type: "image/png" },
+      { url: "/icons/icon-180x180.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -94,6 +108,7 @@ export default function RootLayout({
               }}
             />
           </AuthGuard>
+          <OnboardingDebug />
           {/* <SessionDebug /> */}
         </Providers>
       </body>

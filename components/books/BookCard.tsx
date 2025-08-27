@@ -14,6 +14,7 @@ interface Book {
   authors?: string[];
   cover: string;
   rating?: number;
+  likelihoodScore?: number; // 0-100 percentage likelihood user will like this book
   reviewCount?: number;
   description?: string;
   subjects?: string[];
@@ -59,7 +60,7 @@ export function BookCard({
       author: book.author,
       cover: book.cover,
       description: book.description,
-      rating: book.rating,
+      rating: book.rating || book.likelihoodScore || 0,
       genre: book.subjects || [],
       publishedYear: book.publishYear,
     };
@@ -89,7 +90,8 @@ export function BookCard({
       author: book.author,
       cover: book.cover,
       description: book.description || "No description available.",
-      rating: book.rating || 0,
+      rating:
+        book.rating || (book.likelihoodScore ? book.likelihoodScore / 20 : 0), // Convert likelihood to 0-5 scale
       status: "want-to-read",
       dateAdded: new Date().toISOString().split("T")[0],
       genre: book.subjects || [],
@@ -237,12 +239,36 @@ export function BookCard({
 
           {/* Rating and status info at bottom */}
           <div className="mt-2 space-y-1">
-            {book.rating && (
+            {/* Publication Year */}
+            {book.publishYear && (
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Published: {book.publishYear}
+              </div>
+            )}
+
+            {/* Likelihood Score or Rating */}
+            {(book.likelihoodScore || book.rating) && (
               <div className="flex items-center">
-                <div className="flex text-yellow-400 text-xs">
-                  {"★".repeat(Math.floor(book.rating))}
-                  {"☆".repeat(5 - Math.floor(book.rating))}
-                </div>
+                {book.likelihoodScore ? (
+                  // Show likelihood score as percentage
+                  <div className="flex items-center">
+                    <div className="text-xs font-medium text-primary-600 dark:text-primary-400">
+                      {book.likelihoodScore}% match
+                    </div>
+                    <div className="ml-2 w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary-400 to-primary-600 rounded-full transition-all duration-300"
+                        style={{ width: `${book.likelihoodScore}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  // Fallback to star rating
+                  <div className="flex text-yellow-400 text-xs">
+                    {"★".repeat(Math.floor(book.rating || 0))}
+                    {"☆".repeat(5 - Math.floor(book.rating || 0))}
+                  </div>
+                )}
                 {book.reviewCount && (
                   <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 truncate">
                     (

@@ -71,10 +71,10 @@ export function Navigation() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
-              <Image src="/logo.png" alt="BookHaven" width={60} height={60} />
-              <span className="text-xl font-bold text-gradient">
+              <Image src="/logo.png" alt="BookHaven" width={72} height={72} />
+            {/*  <span className="text-xl font-bold text-gradient">
                 Book Haven
-              </span>
+              </span> */}
             </Link>
           </div>
 

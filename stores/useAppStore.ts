@@ -342,6 +342,20 @@ export const useAppStore = create<AppState>()(
           authorRatings: [],
         }),
 
+      // Debug action to completely reset the store
+      resetAllData: () =>
+        set({
+          hasCompletedOnboarding: false,
+          isOnboardingInProgress: false,
+          currentOnboardingStep: 1,
+          userPreferences: null,
+          bookRatings: [],
+          authorRatings: [],
+          userBooks: [],
+          readingGoals: [],
+          isLoading: false,
+        }),
+
       // Computed getters
       getRecommendationData: () => {
         const state = get();
@@ -358,10 +372,12 @@ export const useAppStore = create<AppState>()(
       // Only persist certain parts of the state
       partialize: (state) => ({
         hasCompletedOnboarding: state.hasCompletedOnboarding,
+        currentOnboardingStep: state.currentOnboardingStep,
         userPreferences: state.userPreferences,
         bookRatings: state.bookRatings,
         authorRatings: state.authorRatings,
         userBooks: state.userBooks, // Include userBooks in persistence
+        readingGoals: state.readingGoals, // Include reading goals
       }),
       // Add some safeguards to prevent hydration issues
       skipHydration: false,

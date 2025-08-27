@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log("Request body:", JSON.stringify(body, null, 2));
 
-    const { preferences, bookRatings, authorRatings } = body;
+    const { preferences, bookRatings, authorRatings, completedAt } = body;
 
     // Validate the data
     if (!preferences?.genres || !Array.isArray(preferences.genres)) {
@@ -41,17 +41,21 @@ export async function POST(request: NextRequest) {
 
     const userEmail = session.user.email;
 
-    // Store user preferences
+    // Store user preferences with all the data
     const userData = {
       preferences: {
         genres: preferences.genres,
         topics: preferences.topics || [],
         languages: preferences.languages || ["en"],
+        readingGoal: preferences.readingGoal,
+        readingPace: preferences.readingPace,
+        bookFormats: preferences.bookFormats || [],
       },
       ratings: {
         books: bookRatings || [],
         authors: authorRatings || [],
       },
+      completedAt: completedAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
