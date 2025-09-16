@@ -67,116 +67,119 @@ export function BookFeed() {
   const { checkAndRefresh, getDailyRandomOffset } = useDailyRefresh();
   const swiperRef = useRef<any>(null);
 
-  const fetchDiscoverFeed = useCallback(async (forceRefresh = false) => {
-    setLoading(true);
-    setError(null);
+  const fetchDiscoverFeed = useCallback(
+    async (forceRefresh = false) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      // Check for daily refresh
-      const refreshedToday = checkAndRefresh();
-      const shouldForceRefresh = forceRefresh || refreshedToday;
+      try {
+        // Check for daily refresh
+        const refreshedToday = checkAndRefresh();
+        const shouldForceRefresh = forceRefresh || refreshedToday;
 
-      // Check cache first (unless forcing refresh)
-      if (!shouldForceRefresh) {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < CACHE_DURATION) {
-            console.log("📚 BookFeed: Cache hit - using stored data");
-            setBooks(data);
-            setLastRefreshTime(new Date(timestamp));
-            setLoading(false);
-            return;
-          } else {
-            console.log("📚 BookFeed: Cache expired - fetching fresh data");
+        // Check cache first (unless forcing refresh)
+        if (!shouldForceRefresh) {
+          const cached = localStorage.getItem(CACHE_KEY);
+          if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+              console.log("📚 BookFeed: Cache hit - using stored data");
+              setBooks(data);
+              setLastRefreshTime(new Date(timestamp));
+              setLoading(false);
+              return;
+            } else {
+              console.log("📚 BookFeed: Cache expired - fetching fresh data");
+            }
           }
+        } else {
+          console.log("📚 BookFeed: Force refresh - fetching fresh data");
         }
-      } else {
-        console.log("📚 BookFeed: Force refresh - fetching fresh data");
-      }
 
-      // Fetch fresh data from multiple genres for variety
-      const allGenres = [
-        "fiction",
-        "mystery",
-        "romance",
-        "science fiction",
-        "fantasy",
-        "thriller",
-        "historical fiction",
-        "literary fiction",
-        "horror",
-        "biography",
-        "young adult",
-        "contemporary",
-        "adventure",
-      ];
+        // Fetch fresh data from multiple genres for variety
+        const allGenres = [
+          "fiction",
+          "mystery",
+          "romance",
+          "science fiction",
+          "fantasy",
+          "thriller",
+          "historical fiction",
+          "literary fiction",
+          "horror",
+          "biography",
+          "young adult",
+          "contemporary",
+          "adventure",
+        ];
 
-      // Use date-based seeding for consistent daily variety
-      const today = new Date().toDateString();
-      const dailySeed = today.split(" ").join("").charCodeAt(0);
+        // Use date-based seeding for consistent daily variety
+        const today = new Date().toDateString();
+        const dailySeed = today.split(" ").join("").charCodeAt(0);
 
-      // Shuffle genres based on daily seed for consistent but changing daily selection
-      const shuffledGenres = allGenres.sort((a, b) => {
-        const aCode = a.charCodeAt(0) + dailySeed;
-        const bCode = b.charCodeAt(0) + dailySeed;
-        return (aCode % 100) - (bCode % 100);
-      });
-
-      const selectedGenres = shuffledGenres.slice(0, 4); // Pick 4 different genres each day
-
-      const bookPromises = selectedGenres.map((genre, index) =>
-        OpenLibraryAPI.searchBooks(
-          genre,
-          6,
-          Math.floor((Math.random() + index) * 20) + (dailySeed % 15) // Date-based offset for daily variety
-        )
-      );
-
-      const results = await Promise.all(bookPromises);
-      const allBooks = results.flatMap((result) => result.docs || []);
-
-      // Filter and format books
-      const validBooks = allBooks
-        .filter((book) => book.cover_i && book.author_name?.[0] && book.title)
-        .slice(0, 8) // Get 8 books for more variety
-        .map((book) => {
-          const primarySubject = book.subject?.[0] || "Fiction";
-
-          return {
-            id: book.key,
-            title: book.title,
-            author: book.author_name![0], // Safe because we filtered above
-            cover: OpenLibraryAPI.getCoverUrl(book.cover_i!, "M"), // Safe because we filtered above
-            tags: book.subject?.slice(0, 3) || [primarySubject],
-            isLiked: false, // Default to not liked
-            comments: [], // Initialize empty comments array
-          };
+        // Shuffle genres based on daily seed for consistent but changing daily selection
+        const shuffledGenres = allGenres.sort((a, b) => {
+          const aCode = a.charCodeAt(0) + dailySeed;
+          const bCode = b.charCodeAt(0) + dailySeed;
+          return (aCode % 100) - (bCode % 100);
         });
 
-      const currentTime = Date.now();
-      setBooks(validBooks);
-      setLastRefreshTime(new Date(currentTime));
+        const selectedGenres = shuffledGenres.slice(0, 4); // Pick 4 different genres each day
 
-      // Cache the results
-      localStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify({
-          data: validBooks,
-          timestamp: currentTime,
-        })
-      );
+        const bookPromises = selectedGenres.map((genre, index) =>
+          OpenLibraryAPI.searchBooks(
+            genre,
+            6,
+            Math.floor((Math.random() + index) * 20) + (dailySeed % 15) // Date-based offset for daily variety
+          )
+        );
 
-      console.log("📚 BookFeed: Fresh data cached successfully");
-    } catch (err) {
-      console.error("Error fetching discover feed:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to load discover feed"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [checkAndRefresh]);
+        const results = await Promise.all(bookPromises);
+        const allBooks = results.flatMap((result) => result.docs || []);
+
+        // Filter and format books
+        const validBooks = allBooks
+          .filter((book) => book.cover_i && book.author_name?.[0] && book.title)
+          .slice(0, 8) // Get 8 books for more variety
+          .map((book) => {
+            const primarySubject = book.subject?.[0] || "Fiction";
+
+            return {
+              id: book.key,
+              title: book.title,
+              author: book.author_name![0], // Safe because we filtered above
+              cover: OpenLibraryAPI.getCoverUrl(book.cover_i!, "M"), // Safe because we filtered above
+              tags: book.subject?.slice(0, 3) || [primarySubject],
+              isLiked: false, // Default to not liked
+              comments: [], // Initialize empty comments array
+            };
+          });
+
+        const currentTime = Date.now();
+        setBooks(validBooks);
+        setLastRefreshTime(new Date(currentTime));
+
+        // Cache the results
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({
+            data: validBooks,
+            timestamp: currentTime,
+          })
+        );
+
+        console.log("📚 BookFeed: Fresh data cached successfully");
+      } catch (err) {
+        console.error("Error fetching discover feed:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load discover feed"
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [checkAndRefresh]
+  );
 
   // Auto-refresh hook - refreshes every 30 minutes
   const { manualRefresh, getFormattedTimeUntilNext } = useAutoRefresh({

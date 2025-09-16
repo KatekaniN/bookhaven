@@ -155,11 +155,11 @@ export default function BookClubsPage() {
         );
       }
 
-  // No local demo fallback: if no API data, show empty state in UI
+      // No local demo fallback: if no API data, show empty state in UI
 
       // Map clubs and compute membership accurately
       // Map clubs and compute membership accurately only when real API data exists
-  if (hasApiData) {
+      if (hasApiData) {
         const userEmail = session?.user?.email;
         let cloudMembershipIds: string[] = [];
         if (userEmail) {
@@ -296,7 +296,6 @@ export default function BookClubsPage() {
       setHasSeenTutorial(true);
     }
   }, [session, status, router, loadData]);
-
 
   const handleJoinClub = async (clubId: string) => {
     try {
@@ -994,8 +993,9 @@ export default function BookClubsPage() {
                   No Active Buddy Reads
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  You haven&apos;t joined any buddy reads yet. Find reading partners
-                  in the &quot;All Clubs&quot; section or start your own!
+                  You haven&apos;t joined any buddy reads yet. Find reading
+                  partners in the &quot;All Clubs&quot; section or start your
+                  own!
                 </p>
                 <div className="flex gap-4 justify-center">
                   <button

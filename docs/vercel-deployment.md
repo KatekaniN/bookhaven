@@ -18,7 +18,7 @@ Create these in Vercel Project Settings → Environment Variables (Scope: Produc
 - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = <project-id>.appspot.com
 - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = <from Firebase>
 - NEXT_PUBLIC_FIREBASE_APP_ID = <from Firebase>
- - NEXT_PUBLIC_NYT_API_KEY = <from NYT Books API> (or set `NYT`)
+- NEXT_PUBLIC_NYT_API_KEY = <from NYT Books API> (or set `NYT`)
 
 Use `.env.example` as a reference.
 

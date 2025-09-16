@@ -41,24 +41,27 @@ export async function GET(request: NextRequest) {
       primaryQuery = query(primaryQuery, firestoreLimit(limitValue));
     }
 
-  const snapshot = await getDocs(primaryQuery);
+    const snapshot = await getDocs(primaryQuery);
 
-  let buddyReads: BuddyRead[] = snapshot.docs.map((doc) => ({
+    let buddyReads: BuddyRead[] = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     })) as BuddyRead[];
 
-  // Results are already ordered by Firestore index (createdAt desc)
+    // Results are already ordered by Firestore index (createdAt desc)
 
     // Apply search filter if provided
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-    buddyReads = buddyReads.filter(
+      buddyReads = buddyReads.filter(
         (read) =>
           read.bookTitle.toLowerCase().includes(query) ||
           read.bookAuthor.toLowerCase().includes(query) ||
-      read.description.toLowerCase().includes(query) ||
-      Array.isArray((read as any).tags) && (read as any).tags.some((tag: string) => tag.toLowerCase().includes(query))
+          read.description.toLowerCase().includes(query) ||
+          (Array.isArray((read as any).tags) &&
+            (read as any).tags.some((tag: string) =>
+              tag.toLowerCase().includes(query)
+            ))
       );
     }
 

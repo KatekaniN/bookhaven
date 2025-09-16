@@ -159,39 +159,42 @@ export function FeaturedBooks() {
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const { checkAndRefresh, getDailyRandomOffset } = useDailyRefresh();
 
-  const loadFeaturedBooks = useCallback(async (forceRefresh = false) => {
-    setLoading(true);
-    setError(null);
+  const loadFeaturedBooks = useCallback(
+    async (forceRefresh = false) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      // Check for daily refresh
-      const refreshedToday = checkAndRefresh();
-      const shouldForceRefresh = forceRefresh || refreshedToday;
-
-      const data = await fetchFeaturedBooks(shouldForceRefresh);
-      setBooks(data);
-
-      // Get timestamp from cache or use current time
       try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const { timestamp } = JSON.parse(cached);
-          setLastRefreshTime(new Date(timestamp));
-        } else {
+        // Check for daily refresh
+        const refreshedToday = checkAndRefresh();
+        const shouldForceRefresh = forceRefresh || refreshedToday;
+
+        const data = await fetchFeaturedBooks(shouldForceRefresh);
+        setBooks(data);
+
+        // Get timestamp from cache or use current time
+        try {
+          const cached = localStorage.getItem(CACHE_KEY);
+          if (cached) {
+            const { timestamp } = JSON.parse(cached);
+            setLastRefreshTime(new Date(timestamp));
+          } else {
+            setLastRefreshTime(new Date());
+          }
+        } catch {
           setLastRefreshTime(new Date());
         }
-      } catch {
-        setLastRefreshTime(new Date());
+      } catch (err) {
+        console.error("Error loading featured books:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load featured books"
+        );
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Error loading featured books:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to load featured books"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [checkAndRefresh]);
+    },
+    [checkAndRefresh]
+  );
 
   // Get initial timestamp from cache for auto-refresh synchronization
   const getInitialTimestamp = () => {
