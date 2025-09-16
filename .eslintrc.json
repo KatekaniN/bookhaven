@@ -1,0 +1,20 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "@next/next/no-img-element": "off",
+    "react/no-unescaped-entities": "error",
+    "react-hooks/exhaustive-deps": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["lib/server/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-require-imports": "off"
+      }
+    }
+  ],
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  }
+}

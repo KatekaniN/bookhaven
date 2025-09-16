@@ -4,6 +4,8 @@ import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 export const authOptions = {
+  // Ensure a stable secret; required for JWT sessions to be verifiable across routes
+  secret: process.env.NEXTAUTH_SECRET || "dev-nextauth-secret-change-me",
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -40,6 +42,21 @@ export const authOptions = {
   session: {
     strategy: "jwt" as const,
   },
+  // Make cookie behavior explicit; in dev, avoid __Secure prefix and secure cookies over http
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
   callbacks: {
     async jwt({ token, user, account, profile }: any) {
       if (user) {
@@ -69,10 +86,10 @@ export const authOptions = {
       return true;
     },
     async redirect({ url, baseUrl }: any) {
-      // Redirect to onboarding after successful sign-in
+      // Don't force redirect to onboarding - let the app handle routing logic
       if (url.startsWith(baseUrl)) return url;
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      return baseUrl + "/onboarding";
+      return baseUrl; // Just redirect to home, let the app decide routing
     },
   },
   debug: process.env.NODE_ENV === "development",

@@ -58,10 +58,10 @@ export function Navigation() {
   }
 
   const navigation = [
-    { name: "Explore", href: "/explore", icon: SparklesIcon },
     { name: "My Books", href: "/my-books", icon: HeartIcon },
     { name: "Reading Dashboard", href: "/stats", icon: ChartBarIcon },
     { name: "Book Clubs", href: "/book-clubs", icon: ChatBubbleLeftRightIcon },
+    { name: "Library", href: "/library", icon: BookOpenIcon },
   ];
 
   return (
@@ -72,7 +72,7 @@ export function Navigation() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
               <Image src="/logo.png" alt="BookHaven" width={72} height={72} />
-            {/*  <span className="text-xl font-bold text-gradient">
+              {/*  <span className="text-xl font-bold text-gradient">
                 Book Haven
               </span> */}
             </Link>

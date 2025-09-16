@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useAppStore, ReadingGoal } from "../../stores/useAppStore";
+import { useAppStore, ReadingGoal, UserBook } from "../../stores/useAppStore";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import {
   ChartBarIcon,
@@ -52,78 +52,66 @@ export default function ReadingDashboardPage() {
   const [stats, setStats] = useState<ReadingStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<
-    "month" | "year" | "all"
+    "week" | "month" | "year" | "all"
   >("year");
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [editingGoal, setEditingGoal] = useState<ReadingGoal | null>(null);
 
-  useEffect(() => {
-    if (status === "loading") return;
-
-    if (!session) {
-      router.push("/auth/signin");
-      return;
-    }
-
-    calculateStats();
-  }, [session, status, userBooks, selectedPeriod]);
-
-  const calculateStats = () => {
+  const calculateStats = useCallback(() => {
     setLoading(true);
 
     try {
       const readBooks = userBooks.filter((book) => book.status === "read");
-      const currentDate = new Date();
-      const currentYear = currentDate.getFullYear();
-      const currentMonth = currentDate.getMonth();
+      const currentlyReading = userBooks.filter(
+        (book) => book.status === "currently-reading"
+      );
+      const wantToRead = userBooks.filter(
+        (book) => book.status === "want-to-read"
+      );
 
-      // Filter books based on selected period
+      // Filter by period if not "all"
       let filteredBooks = readBooks;
-      if (selectedPeriod === "year") {
-        filteredBooks = readBooks.filter(
-          (book) =>
-            book.finishedReading &&
-            new Date(book.finishedReading).getFullYear() === currentYear
-        );
-      } else if (selectedPeriod === "month") {
-        filteredBooks = readBooks.filter(
-          (book) =>
-            book.finishedReading &&
-            new Date(book.finishedReading).getFullYear() === currentYear &&
-            new Date(book.finishedReading).getMonth() === currentMonth
-        );
+      if (selectedPeriod !== "all") {
+        const now = new Date();
+        const cutoffDate = new Date();
+
+        switch (selectedPeriod) {
+          case "year":
+            cutoffDate.setFullYear(now.getFullYear() - 1);
+            break;
+          case "month":
+            cutoffDate.setMonth(now.getMonth() - 1);
+            break;
+          case "week":
+            // Get start of current week (Sunday)
+            const currentDay = now.getDay();
+            cutoffDate.setDate(now.getDate() - currentDay);
+            cutoffDate.setHours(0, 0, 0, 0);
+            break;
+        }
+
+        filteredBooks = readBooks.filter((book) => {
+          if (!book.finishedReading) return false;
+          return new Date(book.finishedReading) >= cutoffDate;
+        });
       }
 
-      // Calculate basic stats
+      // Basic stats
       const totalBooksRead = filteredBooks.length;
       const totalPagesRead = filteredBooks.reduce(
-        (total, book) => total + (book.pages || 0),
+        (sum, book) => sum + (book.pages || 0),
         0
       );
-      const averageRating =
+      const avgRating =
         filteredBooks.length > 0
           ? filteredBooks.reduce(
-              (total, book) => total + (book.rating || 0),
+              (sum, book) => sum + (book.userRating || book.rating || 0),
               0
             ) / filteredBooks.length
           : 0;
 
-      // Estimate reading time (assuming 250 words per page, 200 words per minute)
-      const totalReadingTime = Math.round((totalPagesRead * 250) / 200);
-
-      // Books this month/year
-      const booksThisMonth = readBooks.filter(
-        (book) =>
-          book.finishedReading &&
-          new Date(book.finishedReading).getFullYear() === currentYear &&
-          new Date(book.finishedReading).getMonth() === currentMonth
-      ).length;
-
-      const booksThisYear = readBooks.filter(
-        (book) =>
-          book.finishedReading &&
-          new Date(book.finishedReading).getFullYear() === currentYear
-      ).length;
+      // Reading pace (books per month)
+      const readingPace = selectedPeriod === "all" ? totalBooksRead / 12 : 0; // Simplified
 
       // Favorite genres
       const genreCounts: Record<string, number> = {};
@@ -132,51 +120,49 @@ export default function ReadingDashboardPage() {
           genreCounts[genre] = (genreCounts[genre] || 0) + 1;
         });
       });
-
       const favoriteGenres = Object.entries(genreCounts)
-        .map(([genre, count]) => ({ genre, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([genre, count]) => ({ genre, count }));
 
-      // Monthly progress (last 12 months)
-      const monthlyProgress = [];
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(currentYear, currentMonth - i, 1);
-        const monthBooks = readBooks.filter((book) => {
-          if (!book.finishedReading) return false;
-          const bookDate = new Date(book.finishedReading);
-          return (
-            bookDate.getFullYear() === date.getFullYear() &&
-            bookDate.getMonth() === date.getMonth()
-          );
-        }).length;
-
-        monthlyProgress.push({
-          month: date.toLocaleDateString("en-US", {
-            month: "short",
-            year: "2-digit",
-          }),
-          books: monthBooks,
-        });
-      }
-
-      // Reading streak (consecutive days with reading activity)
+      // Reading streak
       const readingStreak = calculateReadingStreak(readBooks);
 
-      // Longest and shortest books
-      const booksWithPages = filteredBooks.filter(
-        (book) => book.pages && book.pages > 0
-      );
-      const longestBook =
-        booksWithPages.length > 0
-          ? booksWithPages.reduce((longest, book) =>
-              (book.pages || 0) > (longest.pages || 0) ? book : longest
-            )
-          : null;
+      // Currently reading progress
+      const currentlyReadingWithProgress = currentlyReading.map((book) => ({
+        ...book,
+        progress: book.pages
+          ? Math.round(((book.currentPage || 0) / book.pages) * 100)
+          : 0,
+      }));
 
-      const shortestBook =
-        booksWithPages.length > 0
-          ? booksWithPages.reduce((shortest, book) =>
+      // Monthly reading data for chart
+      const monthlyData = Array.from({ length: 12 }, (_, i) => {
+        const month = new Date();
+        month.setMonth(i);
+        const monthBooks = readBooks.filter((book) => {
+          if (!book.finishedReading) return false;
+          const finishedDate = new Date(book.finishedReading);
+          return (
+            finishedDate.getMonth() === i &&
+            finishedDate.getFullYear() === new Date().getFullYear()
+          );
+        });
+        return {
+          month: month.toLocaleDateString("en-US", { month: "short" }),
+          books: monthBooks.length,
+          pages: monthBooks.reduce((sum, book) => sum + (book.pages || 0), 0),
+        };
+      });
+
+      // Longest and shortest books
+      const longest = filteredBooks.reduce(
+        (max, book) => ((book.pages || 0) > (max.pages || 0) ? book : max),
+        filteredBooks[0] || null
+      );
+      const shortest =
+        filteredBooks.length > 1
+          ? filteredBooks.reduce((shortest, book) =>
               (book.pages || 0) < (shortest.pages || 0) ? book : shortest
             )
           : null;
@@ -198,19 +184,15 @@ export default function ReadingDashboardPage() {
       setStats({
         totalBooksRead,
         totalPagesRead,
-        averageRating,
-        totalReadingTime,
-        booksThisMonth,
-        booksThisYear,
+        averageRating: avgRating,
+        totalReadingTime: readingPace * 60, // Convert to minutes
+        booksThisMonth: 0, // Will be calculated based on period
+        booksThisYear: 0, // Will be calculated based on period
         favoriteGenres,
-        monthlyProgress,
+        monthlyProgress: monthlyData,
         readingStreak,
-        longestBook: longestBook
-          ? { title: longestBook.title, pages: longestBook.pages || 0 }
-          : null,
-        shortestBook: shortestBook
-          ? { title: shortestBook.title, pages: shortestBook.pages || 0 }
-          : null,
+        longestBook: longest,
+        shortestBook: shortest,
         mostRatedGenre,
       });
     } catch (error) {
@@ -218,27 +200,55 @@ export default function ReadingDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userBooks, selectedPeriod]);
+
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (!session) {
+      router.push("/auth/signin");
+      return;
+    }
+
+    calculateStats();
+  }, [session, status, userBooks, selectedPeriod, calculateStats, router]);
 
   const calculateReadingStreak = (books: any[]) => {
-    // Simple implementation - count consecutive days with completed books
+    // Calculate consecutive weeks with reading activity
     const completedDates = books
       .filter((book) => book.finishedReading)
-      .map((book) => new Date(book.finishedReading).toDateString())
-      .sort();
+      .map((book) => new Date(book.finishedReading))
+      .sort((a, b) => b.getTime() - a.getTime()); // Sort newest first
 
     if (completedDates.length === 0) return 0;
 
-    let streak = 1;
-    for (let i = 1; i < completedDates.length; i++) {
-      const current = new Date(completedDates[i]);
-      const previous = new Date(completedDates[i - 1]);
-      const diffTime = current.getTime() - previous.getTime();
-      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    let streak = 0;
+    const currentDate = new Date();
 
-      if (diffDays <= 7) {
-        // Within a week
+    // Get the start of current week (Sunday)
+    const getWeekStart = (date: Date) => {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day;
+      return new Date(d.setDate(diff));
+    };
+
+    let weekToCheck = getWeekStart(currentDate);
+
+    // Check each week going backwards
+    while (true) {
+      const weekEnd = new Date(weekToCheck);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      // Check if there's any book completed in this week
+      const hasBookThisWeek = completedDates.some(
+        (date) => date >= weekToCheck && date <= weekEnd
+      );
+
+      if (hasBookThisWeek) {
         streak++;
+        // Move to previous week
+        weekToCheck.setDate(weekToCheck.getDate() - 7);
       } else {
         break;
       }
@@ -287,25 +297,35 @@ export default function ReadingDashboardPage() {
         </div>
 
         {/* Reading Goals Section */}
-        <ReadingGoalsSection
-          readingGoals={readingGoals}
-          userBooks={userBooks}
-          currentYear={new Date().getFullYear()}
-          onAddGoal={() => setShowGoalModal(true)}
-          onEditGoal={(goal) => {
-            setEditingGoal(goal);
-            setShowGoalModal(true);
-          }}
-          onDeleteGoal={(goalId) => {
-            removeReadingGoal(goalId);
-            toast.success("Reading goal deleted");
-          }}
-        />
+        <Suspense
+          fallback={
+            <div className="mb-8 animate-pulse">
+              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-6 w-64"></div>
+              <div className="h-40 bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
+            </div>
+          }
+        >
+          <ReadingGoalsSection
+            readingGoals={readingGoals}
+            userBooks={userBooks}
+            currentYear={new Date().getFullYear()}
+            onAddGoal={() => setShowGoalModal(true)}
+            onEditGoal={(goal) => {
+              setEditingGoal(goal);
+              setShowGoalModal(true);
+            }}
+            onDeleteGoal={(goalId) => {
+              removeReadingGoal(goalId);
+              toast.success("Reading goal deleted");
+            }}
+          />
+        </Suspense>
 
         {/* Period Selector */}
         <div className="mb-8">
           <div className="flex gap-2">
             {[
+              { key: "week" as const, label: "This Week" },
               { key: "month" as const, label: "This Month" },
               { key: "year" as const, label: "This Year" },
               { key: "all" as const, label: "All Time" },
@@ -330,12 +350,12 @@ export default function ReadingDashboardPage() {
           {/* Books Read */}
           <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
-              <BookOpenIcon className="h-6 w-6 text-blue-600" />
+              <BookOpenIcon className="h-6 w-6 text-blue-400" />
               <h3 className="font-semibold text-gray-900 dark:text-white">
                 Books Read
               </h3>
             </div>
-            <p className="text-3xl font-bold text-blue-600">
+            <p className="text-3xl font-bold text-blue-400">
               {stats.totalBooksRead}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -350,12 +370,12 @@ export default function ReadingDashboardPage() {
           {/* Pages Read */}
           <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
-              <BookOpenIcon className="h-6 w-6 text-green-600" />
+              <BookOpenIcon className="h-6 w-6 text-secondary-400" />
               <h3 className="font-semibold text-gray-900 dark:text-white">
                 Pages Read
               </h3>
             </div>
-            <p className="text-3xl font-bold text-green-600">
+            <p className="text-3xl font-bold text-secondary-400">
               {stats.totalPagesRead.toLocaleString()}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -366,13 +386,13 @@ export default function ReadingDashboardPage() {
           {/* Average Rating */}
           <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
-              <StarIcon className="h-6 w-6 text-yellow-600" />
+              <StarIcon className="h-6 w-6 text-primary-600" />
               <h3 className="font-semibold text-gray-900 dark:text-white">
                 Avg Rating
               </h3>
             </div>
             <div className="flex items-center gap-2">
-              <p className="text-3xl font-bold text-yellow-600">
+              <p className="text-3xl font-bold text-primary-600">
                 {stats.averageRating.toFixed(1)}
               </p>
               <div className="flex">
@@ -381,7 +401,7 @@ export default function ReadingDashboardPage() {
                     key={star}
                     className={`h-5 w-5 ${
                       star <= Math.round(stats.averageRating)
-                        ? "text-yellow-400"
+                        ? "text-secondary-400"
                         : "text-gray-300 dark:text-gray-600"
                     }`}
                   />
@@ -393,16 +413,16 @@ export default function ReadingDashboardPage() {
           {/* Reading Streak */}
           <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
-              <TrophyIcon className="h-6 w-6 text-purple-600" />
+              <TrophyIcon className="h-6 w-6 text-orange-500" />
               <h3 className="font-semibold text-gray-900 dark:text-white">
                 Reading Streak
               </h3>
             </div>
-            <p className="text-3xl font-bold text-purple-600">
+            <p className="text-3xl font-bold text-orange-500">
               {stats.readingStreak}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              consecutive periods
+              consecutive weeks
             </p>
           </div>
         </div>
@@ -561,34 +581,66 @@ export default function ReadingDashboardPage() {
 
         {/* Goal Modal */}
         {showGoalModal && (
-          <GoalModal
-            goal={editingGoal}
-            onClose={() => {
-              setShowGoalModal(false);
-              setEditingGoal(null);
-            }}
-            onSave={(goalData) => {
-              if (editingGoal) {
-                updateReadingGoal(editingGoal.id, goalData);
-                toast.success("Reading goal updated!");
-              } else {
-                const newGoal: ReadingGoal = {
-                  id: Date.now().toString(),
-                  year: goalData.year || new Date().getFullYear(),
-                  targetBooks: goalData.targetBooks || 12,
-                  targetPages: goalData.targetPages,
-                  targetGenres: goalData.targetGenres,
-                  isActive: true,
-                  createdAt: new Date().toISOString(),
-                  description: goalData.description,
-                };
-                addReadingGoal(newGoal);
-                toast.success("Reading goal created!");
-              }
-              setShowGoalModal(false);
-              setEditingGoal(null);
-            }}
-          />
+          <Suspense
+            fallback={
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md animate-pulse">
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                  <div className="space-y-4">
+                    <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            }
+          >
+            <GoalModal
+              goal={editingGoal}
+              onClose={() => {
+                setShowGoalModal(false);
+                setEditingGoal(null);
+              }}
+              onSave={(goalData) => {
+                console.log("Goal modal onSave called:", {
+                  editingGoal,
+                  goalData,
+                });
+                if (editingGoal) {
+                  // When editing, preserve the original goal's properties and only update the provided ones
+                  const updatedGoalData = {
+                    ...goalData,
+                    id: editingGoal.id, // Ensure we keep the original ID
+                    year: editingGoal.year, // Keep the original year
+                    isActive: editingGoal.isActive, // Preserve active status
+                    createdAt: editingGoal.createdAt, // Keep original creation date
+                  };
+                  console.log(
+                    "Calling updateReadingGoal with:",
+                    editingGoal.id,
+                    updatedGoalData
+                  );
+                  updateReadingGoal(editingGoal.id, updatedGoalData);
+                  toast.success("Reading goal updated!");
+                } else {
+                  const newGoal: ReadingGoal = {
+                    id: Date.now().toString(),
+                    year: goalData.year || new Date().getFullYear(),
+                    targetBooks: goalData.targetBooks || 12,
+                    targetPages: goalData.targetPages,
+                    targetGenres: goalData.targetGenres,
+                    isActive: true,
+                    createdAt: new Date().toISOString(),
+                    description: goalData.description,
+                  };
+                  addReadingGoal(newGoal);
+                  toast.success("Reading goal created!");
+                }
+                setShowGoalModal(false);
+                setEditingGoal(null);
+              }}
+            />
+          </Suspense>
         )}
       </div>
     </div>
@@ -598,7 +650,7 @@ export default function ReadingDashboardPage() {
 // Reading Goals Section Component
 interface ReadingGoalsSectionProps {
   readingGoals: ReadingGoal[];
-  userBooks: any[];
+  userBooks: UserBook[];
   currentYear: number;
   onAddGoal: () => void;
   onEditGoal: (goal: ReadingGoal) => void;
@@ -613,157 +665,122 @@ function ReadingGoalsSection({
   onEditGoal,
   onDeleteGoal,
 }: ReadingGoalsSectionProps) {
-  const activeGoal = readingGoals.find(
-    (goal) => goal.year === currentYear && goal.isActive
-  );
-
-  const booksReadThisYear = userBooks.filter((book) => {
-    if (book.status !== "read" || !book.finishedReading) return false;
-    return new Date(book.finishedReading).getFullYear() === currentYear;
+  const currentGoal = readingGoals.find((goal) => goal.year === currentYear);
+  const booksRead = userBooks.filter((book) => {
+    if (!book.finishedReading) return false;
+    const finishedYear = new Date(book.finishedReading).getFullYear();
+    return finishedYear === currentYear;
   }).length;
 
-  const pagesReadThisYear = userBooks
-    .filter((book) => {
-      if (book.status !== "read" || !book.finishedReading) return false;
-      return new Date(book.finishedReading).getFullYear() === currentYear;
-    })
-    .reduce((total, book) => total + (book.pages || 0), 0);
-
   return (
-    <div className="mb-8">
+    <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <TrophyIcon className="h-6 w-6 text-primary-600" />
-          {currentYear} Reading Goals
-        </h2>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <TrophyIcon className="h-6 w-6 text-amber-600" />
+          Reading Goals
+        </h3>
         <button
           onClick={onAddGoal}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors flex items-center gap-2"
         >
           <PlusIcon className="h-4 w-4" />
-          {activeGoal ? "Edit Goal" : "Set Goal"}
+          Add Goal
         </button>
       </div>
 
-      {activeGoal ? (
-        <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Books Goal */}
+      {currentGoal ? (
+        <div>
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-900 dark:text-white">
-                  Books Goal
-                </h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => onEditGoal(activeGoal)}
-                    className="p-1 text-gray-500 hover:text-primary-600 transition-colors"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => onDeleteGoal(activeGoal.id)}
-                    className="p-1 text-gray-500 hover:text-red-600 transition-colors"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="mb-3">
-                <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
-                  <span>
-                    {booksReadThisYear} of {activeGoal.targetBooks} books
-                  </span>
-                  <span>
-                    {Math.round(
-                      (booksReadThisYear / activeGoal.targetBooks) * 100
-                    )}
-                    %
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                  <div
-                    className="bg-primary-600 h-3 rounded-full transition-all duration-300"
-                    style={{
-                      width: `${Math.min(
-                        (booksReadThisYear / activeGoal.targetBooks) * 100,
-                        100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-              {booksReadThisYear >= activeGoal.targetBooks && (
-                <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
-                  <CheckCircleIcon className="h-4 w-4" />
-                  Goal achieved! 🎉
-                </div>
-              )}
-            </div>
-
-            {/* Pages Goal (if set) */}
-            {activeGoal.targetPages && (
-              <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
-                  Pages Goal
-                </h3>
-                <div className="mb-3">
-                  <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    <span>
-                      {pagesReadThisYear.toLocaleString()} of{" "}
-                      {activeGoal.targetPages.toLocaleString()} pages
-                    </span>
-                    <span>
-                      {Math.round(
-                        (pagesReadThisYear / activeGoal.targetPages) * 100
-                      )}
-                      %
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                    <div
-                      className="bg-green-600 h-3 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${Math.min(
-                          (pagesReadThisYear / activeGoal.targetPages) * 100,
-                          100
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-                {pagesReadThisYear >= activeGoal.targetPages && (
-                  <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
-                    <CheckCircleIcon className="h-4 w-4" />
-                    Goal achieved! 🎉
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {activeGoal.description && (
-            <div className="mt-4 p-3 bg-primary-50 dark:bg-primary-900/30 rounded-lg">
-              <p className="text-sm text-primary-700 dark:text-primary-300">
-                {activeGoal.description}
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {currentYear} Reading Goal
+              </h4>
+              <p className="text-gray-600 dark:text-gray-400">
+                Target: {currentGoal.targetBooks} books
               </p>
             </div>
-          )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => onEditGoal(currentGoal)}
+                className="p-2 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-800/30 text-blue-600 rounded-lg transition-colors"
+                title="Edit Goal"
+              >
+                <PencilIcon className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => onDeleteGoal(currentGoal.id)}
+                className="p-2 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-800/30 text-red-600 rounded-lg transition-colors"
+                title="Delete Goal"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Progress: {booksRead} / {currentGoal.targetBooks} books
+              </span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {Math.round((booksRead / currentGoal.targetBooks) * 100)}%
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+              <div
+                className="bg-gradient-to-r from-primary-500 to-secondary-500 h-3 rounded-full transition-all duration-300"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (booksRead / currentGoal.targetBooks) * 100
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Books Remaining
+              </p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {Math.max(0, currentGoal.targetBooks - booksRead)}
+              </p>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {booksRead >= currentGoal.targetBooks
+                  ? "Goal Achieved!"
+                  : "Behind/Ahead"}
+              </p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {booksRead >= currentGoal.targetBooks
+                  ? "🎉"
+                  : `${
+                      booksRead -
+                      Math.floor(
+                        (new Date().getMonth() + 1) *
+                          (currentGoal.targetBooks / 12)
+                      )
+                    }`}
+              </p>
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-8 border border-white/20 dark:border-gray-700/20 shadow-lg text-center">
-          <TrophyIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            No Reading Goal Set for {currentYear}
-          </h3>
+        <div className="text-center py-8">
+          <TrophyIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            No Reading Goal Set
+          </h4>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Set a reading goal to track your progress and stay motivated!
+            Set a reading goal for {currentYear} to track your progress!
           </p>
           <button
             onClick={onAddGoal}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
           >
-            <PlusIcon className="h-5 w-5" />
             Set Reading Goal
           </button>
         </div>
@@ -781,9 +798,25 @@ interface GoalModalProps {
 
 function GoalModal({ goal, onClose, onSave }: GoalModalProps) {
   const [targetBooks, setTargetBooks] = useState(goal?.targetBooks || 12);
-  const [targetPages, setTargetPages] = useState(goal?.targetPages || "");
+  const [targetPages, setTargetPages] = useState(
+    goal?.targetPages?.toString() || ""
+  );
   const [description, setDescription] = useState(goal?.description || "");
-  const currentYear = new Date().getFullYear();
+  const currentYear = goal?.year || new Date().getFullYear(); // Use goal's year if editing
+
+  // Update form values when goal prop changes
+  useEffect(() => {
+    if (goal) {
+      setTargetBooks(goal.targetBooks || 12);
+      setTargetPages(goal.targetPages?.toString() || "");
+      setDescription(goal.description || "");
+    } else {
+      // Reset to defaults for new goal
+      setTargetBooks(12);
+      setTargetPages("");
+      setDescription("");
+    }
+  }, [goal]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

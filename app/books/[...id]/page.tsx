@@ -14,6 +14,7 @@ import {
   PlusIcon,
   ClockIcon,
   CheckCircleIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline";
 import {
   HeartIcon as HeartSolidIcon,
@@ -214,7 +215,9 @@ export default function BookDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">📚</div>
+          <div className="flex justify-center mb-4">
+            <BookOpenIcon className="w-16 h-16 text-gray-400" />
+          </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Book Not Found
           </h1>

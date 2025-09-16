@@ -2,8 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { HeartIcon, PlusIcon, CheckIcon } from "@heroicons/react/24/outline";
-import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
+import Image from "next/image";
+import {
+  HeartIcon,
+  PlusIcon,
+  CheckIcon,
+  StarIcon,
+} from "@heroicons/react/24/outline";
+import {
+  HeartIcon as HeartSolidIcon,
+  StarIcon as StarSolidIcon,
+} from "@heroicons/react/24/solid";
 import { useAppStore, UserBook } from "../../stores/useAppStore";
 import toast from "react-hot-toast";
 
@@ -144,21 +153,28 @@ export function BookCard({
         {/* Book Cover */}
         <div className="relative overflow-hidden rounded-t-lg flex-shrink-0">
           {!imageError ? (
-            <img
+            <Image
               src={book.cover}
               alt={book.title}
+              width={200}
+              height={300}
               className={`${sizeClasses.image} w-full object-cover transition-transform duration-200 group-hover:scale-105`}
               onError={() => setImageError(true)}
+              placeholder="blur"
+              blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkbHB0eH/xAAVAQEBAQAAAAAAAAAAAAAAAAAAAQIF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R6i+GCXVw=="
+              priority={size === "lg"} // Prioritize larger images
             />
           ) : (
             <div
               className={`${sizeClasses.image} w-full bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 flex items-center justify-center p-4`}
             >
               <div className="text-center">
-                <img
+                <Image
                   src="/logo.png"
                   alt="BookHaven Logo"
-                  className="w-12 h-12 mx-auto mb-2 opacity-60"
+                  width={48}
+                  height={48}
+                  className="mx-auto mb-2 opacity-60"
                 />
                 <div className="text-primary-600 dark:text-primary-400 text-xs font-medium line-clamp-2">
                   {book.title}
@@ -291,8 +307,11 @@ export function BookCard({
                   </span>
                 </div>
                 {bookInLibrary.userRating && (
-                  <div className="truncate">
-                    Your rating: {bookInLibrary.userRating}/5 ⭐
+                  <div className="truncate flex items-center">
+                    <span className="mr-1">
+                      Your rating: {bookInLibrary.userRating}/5
+                    </span>
+                    <StarSolidIcon className="w-4 h-4 text-yellow-500" />
                   </div>
                 )}
               </div>

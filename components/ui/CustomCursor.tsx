@@ -7,7 +7,7 @@ export function CustomCursor() {
   const [isHovering, setIsHovering] = useState(false);
   const [isClicking, setIsClicking] = useState(false);
   const [trail, setTrail] = useState<
-    Array<{ x: number; y: number; id: number }>
+    Array<{ x: number; y: number; id: string }>
   >([]);
   const cursorRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number>();
@@ -29,6 +29,7 @@ export function CustomCursor() {
 
   useEffect(() => {
     let trailId = 0;
+    const startTime = Date.now();
 
     const updateMousePosition = (e: MouseEvent) => {
       const x = e.clientX;
@@ -52,7 +53,9 @@ export function CustomCursor() {
         // ~60fps
         lastTrailUpdate.current = now;
         setTrail((prev) => {
-          const newTrail = [...prev, { x, y, id: trailId++ }];
+          // Create unique ID using timestamp and counter
+          const uniqueId = `${startTime}-${trailId++}`;
+          const newTrail = [...prev, { x, y, id: uniqueId }];
           return newTrail.slice(-6); // Reduced trail length for better performance
         });
       }

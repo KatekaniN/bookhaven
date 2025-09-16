@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 
 const genres = [
@@ -152,13 +153,17 @@ export function TrendingGenres() {
               {/* Book Cover - Made much larger */}
               <div className="relative z-10 flex justify-center mb-6">
                 <div className="relative transform group-hover:scale-110 transition-transform duration-300">
-                  <img
+                  <Image
                     src={genre.cover}
                     alt={`${genre.name} book cover`}
+                    width={128}
+                    height={192}
                     className="w-32 h-48 object-cover rounded-xl shadow-2xl border-2 border-white/40 dark:border-gray-600/40 group-hover:shadow-primary-500/20 transition-all duration-300"
                     onError={(e) => {
                       e.currentTarget.src = "/placeholder-book.jpg";
                     }}
+                    placeholder="blur"
+                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkbHB0eH/xAAVAQEBAQAAAAAAAAAAAAAAAAAAAQIF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R6i+GCXVw=="
                   />
                   {/* Subtle glow effect */}
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>

@@ -90,6 +90,46 @@ export interface BookClubReading {
   progress: { [userId: string]: number };
 }
 
+export interface BuddyRead {
+  id: string;
+  bookTitle: string;
+  bookAuthor: string;
+  bookCover: string;
+  bookId?: string;
+  hostId: string;
+  participants: {
+    id: string;
+    name: string;
+    avatar?: string;
+    joinedAt: Date;
+    progress: number;
+  }[];
+  startDate: Date;
+  targetEndDate: Date;
+  maxParticipants: number;
+  description: string;
+  isPrivate: boolean;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  status: "upcoming" | "active" | "completed" | "cancelled";
+}
+
+export interface UserBookClubMembership {
+  clubId: string;
+  joinedAt: Date;
+  role: "member" | "moderator" | "owner";
+  isActive: boolean;
+}
+
+export interface UserBuddyReadParticipation {
+  buddyReadId: string;
+  joinedAt: Date;
+  progress: number;
+  isActive: boolean;
+  role: "participant" | "host";
+}
+
 export interface ReadingGoal {
   id: string;
   userId: string;
@@ -134,6 +174,10 @@ export interface UserPreference {
   rating: number; // 1-5 stars
   isLiked: boolean;
   weight: number; // For recommendation algorithm (1-10)
+  // Additional book details for display purposes
+  title?: string;
+  author?: string;
+  cover?: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { BookCard } from "../../components/books/BookCard";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { useAppStore } from "../../stores/useAppStore";
@@ -10,6 +10,12 @@ import {
   SparklesIcon,
   FunnelIcon,
   ClockIcon,
+  BoltIcon,
+  HeartIcon,
+  StarIcon,
+  MoonIcon,
+  BookOpenIcon,
+  AcademicCapIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 
@@ -46,38 +52,53 @@ const genres = [
   "Comedy",
 ];
 
+// Icon mapping function
+const getMoodIcon = (moodName: string) => {
+  const iconClass = "w-4 h-4";
+  switch (moodName) {
+    case "Cozy & Comfortable":
+      return <ClockIcon className={iconClass} />;
+    case "Fast-paced & Exciting":
+      return <BoltIcon className={iconClass} />;
+    case "Emotional & Deep":
+      return <HeartIcon className={iconClass} />;
+    case "Light & Fun":
+      return <StarIcon className={iconClass} />;
+    case "Dark & Mysterious":
+      return <MoonIcon className={iconClass} />;
+    case "Educational":
+      return <BookOpenIcon className={iconClass} />;
+    default:
+      return <SparklesIcon className={iconClass} />;
+  }
+};
+
 const moods = [
   {
     name: "Cozy & Comfortable",
-    icon: "☕",
     color:
       "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
   },
   {
     name: "Fast-paced & Exciting",
-    icon: "⚡",
     color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
   },
   {
     name: "Emotional & Deep",
-    icon: "💙",
     color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
   },
   {
     name: "Light & Fun",
-    icon: "🌟",
     color:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
   },
   {
     name: "Dark & Mysterious",
-    icon: "🌙",
     color:
       "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
   },
   {
     name: "Educational",
-    icon: "📚",
     color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
   },
 ];
@@ -210,28 +231,31 @@ export default function DiscoverPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
 
-  const loadBooks = async (forceRefresh = false) => {
-    setIsLoading(true);
-    try {
-      // Clear old discover books from cache first
-      if (forceRefresh) {
-        clearOldDiscoverBooks();
+  const loadBooks = useCallback(
+    async (forceRefresh = false) => {
+      setIsLoading(true);
+      try {
+        // Clear old discover books from cache first
+        if (forceRefresh) {
+          clearOldDiscoverBooks();
+        }
+
+        const books = await fetchDiscoverBooks();
+        setAllBooks(books);
+        setLastRefreshTime(new Date());
+      } catch (error) {
+        console.error("Failed to load books:", error);
+        toast.error("Failed to load books. Please try again.");
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [clearOldDiscoverBooks]
+  );
 
-      const books = await fetchDiscoverBooks();
-      setAllBooks(books);
-      setLastRefreshTime(new Date());
-    } catch (error) {
-      console.error("Failed to load books:", error);
-      toast.error("Failed to load books. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Auto-refresh hook - refreshes every hour
+  // Auto-refresh hook - refreshes every 30 minutes
   const { manualRefresh, getFormattedTimeUntilNext } = useAutoRefresh({
-    interval: 60 * 60 * 1000, // 1 hour
+    interval: 30 * 60 * 1000, // 30 minutes for more frequent updates
     enabled: true,
     onRefresh: () => loadBooks(true),
   });
@@ -239,7 +263,7 @@ export default function DiscoverPage() {
   // Load books on component mount
   useEffect(() => {
     loadBooks();
-  }, [clearOldDiscoverBooks]);
+  }, [loadBooks, clearOldDiscoverBooks]);
 
   // Filter books based on current criteria
   const filteredBooks = useMemo(() => {
@@ -421,7 +445,7 @@ export default function DiscoverPage() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
               <SparklesIcon className="h-5 w-5 mr-2 text-primary-500" />
-              What's your reading mood?
+              What&apos;s your reading mood?
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {moods.map((mood) => (
@@ -434,7 +458,9 @@ export default function DiscoverPage() {
                       : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800"
                   }`}
                 >
-                  <div className="text-xl sm:text-2xl mb-1">{mood.icon}</div>
+                  <div className="text-xl sm:text-2xl mb-1">
+                    {getMoodIcon(mood.name)}
+                  </div>
                   <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
                     {mood.name}
                   </div>

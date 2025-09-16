@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -25,6 +26,21 @@ import {
   StarIcon as StarIconSolid,
 } from "@heroicons/react/24/solid";
 import { useAppStore, UserBook } from "../../stores/useAppStore";
+import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
+
+// Dynamic imports for better performance
+const BookCard = dynamic(
+  () =>
+    import("../../components/books/BookCard").then((mod) => ({
+      default: mod.BookCard,
+    })),
+  {
+    loading: () => (
+      <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg h-96"></div>
+    ),
+    ssr: false,
+  }
+);
 
 export default function MyBooksPage() {
   const { data: session } = useSession();
@@ -546,7 +562,7 @@ export default function MyBooksPage() {
                   {book.userReview && (
                     <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-md">
                       <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
-                        "{book.userReview}"
+                        &ldquo;{book.userReview}&rdquo;
                       </p>
                     </div>
                   )}

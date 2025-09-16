@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   StarIcon,
   HeartIcon,
@@ -12,15 +13,40 @@ import {
   UserIcon,
   Cog6ToothIcon,
   CheckCircleIcon,
+  SparklesIcon,
+  AcademicCapIcon,
 } from "@heroicons/react/24/outline";
 import {
   HeartIcon as HeartSolidIcon,
   StarIcon as StarSolidIcon,
+  SparklesIcon as SparklesSolidIcon,
 } from "@heroicons/react/24/solid";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
-import { PersonalizedRecommendations } from "../../components/home/PersonalizedRecommendations";
 import { useAppStore, UserBook } from "../../stores/useAppStore";
 import toast from "react-hot-toast";
+
+// Dynamic imports for performance
+const PersonalizedRecommendations = dynamic(
+  () =>
+    import("../../components/home/PersonalizedRecommendations").then((mod) => ({
+      default: mod.PersonalizedRecommendations,
+    })),
+  {
+    loading: () => (
+      <div className="animate-pulse">
+        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-4 w-48"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="h-80 bg-gray-200 dark:bg-gray-700 rounded-lg"
+            ></div>
+          ))}
+        </div>
+      </div>
+    ),
+  }
+);
 
 interface UserData {
   preferences: {
@@ -162,245 +188,429 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative overflow-hidden">
+      {/* Magical Background Elements */}
+      <div className="absolute inset-0">
+        {/* Magical paper texture overlay */}
+        <div
+          className="absolute inset-0 opacity-30 dark:opacity-15"
+          style={{
+            backgroundImage: "url(/home/paper-texture.png)",
+            backgroundSize: "512px 512px",
+            backgroundRepeat: "repeat",
+          }}
+        />
+
+        {/* Small floating particles */}
+        <div className="absolute top-20 left-10 w-2 h-2 bg-secondary-300 rounded-full opacity-60 animate-float"></div>
+        <div
+          className="absolute top-40 right-20 w-1 h-1 bg-primary-300 rounded-full opacity-40 animate-float"
+          style={{ animationDelay: "1s" }}
+        ></div>
+        <div
+          className="absolute bottom-40 left-20 w-1.5 h-1.5 bg-accent-300 rounded-full opacity-50 animate-float"
+          style={{ animationDelay: "2s" }}
+        ></div>
+        <div
+          className="absolute bottom-20 right-10 w-2 h-2 bg-secondary-200 rounded-full opacity-30 animate-float"
+          style={{ animationDelay: "0.5s" }}
+        ></div>
+      </div>
+
+      <div className="relative z-10 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4 sm:py-6 md:py-8">
         {/* Profile Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center">
-              <UserIcon className="w-8 h-8 text-white" />
+        <div className="relative">
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border border-primary-200 dark:border-primary-700 shadow-lg p-4 sm:p-6 md:p-8 mb-6 sm:mb-8">
+            {/* Decorative corner elements - hidden on mobile */}
+            <div className="hidden sm:block absolute top-0 left-0 w-8 sm:w-10 md:w-12 h-8 sm:h-10 md:h-12 opacity-30">
+              <img
+                src="/library/decorations/corner-1.png"
+                alt=""
+                className="w-full h-full object-contain"
+              />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {session.user.name || session.user.email}
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">
-                {session.user.email}
-              </p>
-              {userData?.updatedAt && (
-                <p className="text-sm text-gray-500 dark:text-gray-500">
-                  Profile updated:{" "}
-                  {new Date(userData.updatedAt).toLocaleDateString()}
+            <div className="hidden sm:block absolute top-0 right-0 w-8 sm:w-10 md:w-12 h-8 sm:h-10 md:h-12 opacity-30 transform scale-x-[-1]">
+              <img
+                src="/library/decorations/corner-2.png"
+                alt=""
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div className="hidden sm:block absolute bottom-0 left-0 w-8 sm:w-10 md:w-12 h-8 sm:h-10 md:h-12 opacity-30 transform scale-y-[-1]">
+              <img
+                src="/library/decorations/corner-3.png"
+                alt=""
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div className="hidden sm:block absolute bottom-0 right-0 w-8 sm:w-10 md:w-12 h-8 sm:h-10 md:h-12 opacity-30 transform scale-x-[-1] scale-y-[-1]">
+              <img
+                src="/library/decorations/corner-4.png"
+                alt=""
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            <div className="flex flex-col md:flex-row items-center md:items-center space-y-4 md:space-y-0 md:space-x-6 relative z-10">
+              {/* Profile Avatar */}
+              <div className="relative">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center border-4 border-white dark:border-gray-700 shadow-lg">
+                  {session?.user?.image ? (
+                    <img
+                      src={session.user.image}
+                      alt="Profile"
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <UserIcon className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
+                  )}
+                  {/* Magical sparkle effect */}
+                  <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-6 sm:h-6 bg-gradient-to-r from-secondary-400 to-accent-400 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-lg">
+                    <SparklesSolidIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 text-center md:text-left">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif font-bold bg-gradient-to-r from-primary-600 via-secondary-600 to-accent-600 bg-clip-text text-transparent mb-2">
+                  {session.user.name ||
+                    session.user.email?.split("@")[0] ||
+                    "Book Haven Reader"}
+                </h1>
+                <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 font-serif italic mb-3 break-words">
+                  {session.user.email}
                 </p>
-              )}
+
+                {/* Profile Badge */}
+                <div className="flex flex-col xs:flex-row items-center justify-center md:justify-start gap-2 xs:gap-3">
+                  <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-full border border-primary-200 dark:border-primary-700">
+                    <BookOpenIcon className="w-3 h-3 sm:w-4 sm:h-4 text-primary-600 dark:text-primary-400 mr-1 sm:mr-2" />
+                    <span className="text-primary-600 dark:text-primary-400 font-serif font-semibold text-xs sm:text-sm">
+                      Book Haven Member
+                    </span>
+                  </div>
+
+                  {hasCompletedOnboarding && (
+                    <div className="inline-flex items-center px-2 sm:px-3 py-1 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full border border-green-200 dark:border-green-700">
+                      <CheckCircleIcon className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 dark:text-green-400 mr-1" />
+                      <span className="text-green-600 dark:text-green-400 font-serif text-xs font-medium">
+                        Onboarded
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {userData?.updatedAt && (
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-500 font-serif italic mt-2">
+                    Profile enchanted:{" "}
+                    {new Date(userData.updatedAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+
+              {/* Reading Level Badge */}
+              <div className="w-full xs:w-auto md:block">
+                <div className="text-center bg-gradient-to-br from-accent-50 to-accent-100 dark:from-accent-900/20 dark:to-accent-800/20 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-accent-200 dark:border-accent-700 min-w-0 xs:min-w-[120px]">
+                  <div className="text-2xl sm:text-3xl font-bold text-accent-600 dark:text-accent-400 font-serif">
+                    {Math.min(Math.floor(userBooks.length / 5) + 1, 10)}
+                  </div>
+                  <div className="text-xs text-accent-700 dark:text-accent-300 font-serif font-medium">
+                    Reading Level
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 font-serif italic mt-1">
+                    {userBooks.length < 5
+                      ? "Novice Reader"
+                      : userBooks.length < 15
+                      ? "Book Explorer"
+                      : userBooks.length < 30
+                      ? "Library Scholar"
+                      : userBooks.length < 50
+                      ? "Book Sage"
+                      : "Grand Bibliophile"}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm mb-8">
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <nav className="flex space-x-8 px-6">
-              <button
-                onClick={() => setActiveTab("overview")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === "overview"
-                    ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                }`}
-              >
-                <BookOpenIcon className="w-5 h-5 inline mr-2" />
-                Overview
-              </button>
-              <button
-                onClick={() => setActiveTab("library")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === "library"
-                    ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                }`}
-              >
-                <BookOpenIcon className="w-5 h-5 inline mr-2" />
-                Library ({userBooks.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("preferences")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === "preferences"
-                    ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                }`}
-              >
-                <Cog6ToothIcon className="w-5 h-5 inline mr-2" />
-                Preferences
-              </button>
-              <button
-                onClick={() => setActiveTab("ratings")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === "ratings"
-                    ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                }`}
-              >
-                <StarIcon className="w-5 h-5 inline mr-2" />
-                My Ratings
-              </button>
-            </nav>
-          </div>
-
-          <div className="p-6">
-            {/* Overview Tab */}
-            {activeTab === "overview" && (
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="bg-purple-50 dark:bg-purple-900 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <BookOpenIcon className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-                      <div className="ml-3">
-                        <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                          {userBooks.length}
-                        </p>
-                        <p className="text-purple-800 dark:text-purple-200">
-                          Books in Library
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-green-50 dark:bg-green-900 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <StarSolidIcon className="w-8 h-8 text-green-600 dark:text-green-400" />
-                      <div className="ml-3">
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                          {userBooks.filter((b) => b.status === "read").length}
-                        </p>
-                        <p className="text-green-800 dark:text-green-200">
-                          Books Read
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-red-50 dark:bg-red-900 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <HeartSolidIcon className="w-8 h-8 text-red-600 dark:text-red-400" />
-                      <div className="ml-3">
-                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                          {userBooks.filter((b) => b.isLiked).length}
-                        </p>
-                        <p className="text-red-800 dark:text-red-200">
-                          Favorite Books
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <BookOpenIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                      <div className="ml-3">
-                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                          {userData?.preferences?.genres?.length ||
-                            userPreferences?.genres?.length ||
-                            0}
-                        </p>
-                        <p className="text-blue-800 dark:text-blue-200">
-                          Favorite Genres
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Recent Activity */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Recent Activity
-                  </h3>
-                  <div className="space-y-3">
-                    {userBooks
-                      .sort(
-                        (a, b) =>
-                          new Date(b.dateAdded).getTime() -
-                          new Date(a.dateAdded).getTime()
-                      )
-                      .slice(0, 5)
-                      .map((book) => (
-                        <div
-                          key={book.id}
-                          className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                        >
-                          <img
-                            src={book.cover}
-                            alt={book.title}
-                            className="w-12 h-16 object-cover rounded"
-                          />
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-900 dark:text-white">
-                              {book.title}
-                            </h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              by {book.author}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-500">
-                              Added{" "}
-                              {new Date(book.dateAdded).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <span
-                              className={`px-2 py-1 text-xs rounded-full ${
-                                book.status === "read"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                                  : book.status === "currently-reading"
-                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-                                  : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
-                              }`}
-                            >
-                              {book.status === "want-to-read"
-                                ? "Want to Read"
-                                : book.status === "currently-reading"
-                                ? "Reading"
-                                : "Read"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    {userBooks.length === 0 && (
-                      <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-                        No books in your library yet. Start discovering books to
-                        add them!
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {userData?.preferences?.genres && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                      Your Favorite Genres
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {userData.preferences.genres.map((genre) => (
-                        <span
-                          key={genre}
-                          className="px-3 py-1 bg-purple-100 dark:bg-purple-800 text-purple-800 dark:text-purple-200 rounded-full text-sm"
-                        >
-                          {genre}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <PersonalizedRecommendations limit={4} />
+        <div className="relative mb-8">
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-primary-200 dark:border-primary-700 shadow-lg overflow-hidden">
+            {/* Header for tabs */}
+            <div className="bg-primary-50 dark:bg-primary-900/20 p-6 border-b border-primary-200 dark:border-primary-700">
+              <div className="flex items-center justify-center">
+                <SparklesSolidIcon className="w-6 h-6 text-primary-500 mr-3" />
+                <h2 className="text-2xl font-serif font-bold text-gray-900 dark:text-white text-center">
+                  Your Reading Journey
+                </h2>
+                <SparklesSolidIcon className="w-6 h-6 text-primary-500 ml-3" />
               </div>
-            )}
+            </div>
 
-            {/* Library Tab */}
-            {activeTab === "library" && (
-              <LibraryDisplay userBooks={userBooks} />
-            )}
+            <div className="border-b border-primary-200 dark:border-primary-700">
+              <nav className="flex flex-wrap sm:flex-nowrap space-x-2 sm:space-x-4 md:space-x-8 px-2 sm:px-4 md:px-8 -mb-px overflow-x-auto">
+                <button
+                  onClick={() => setActiveTab("overview")}
+                  className={`group py-3 sm:py-4 px-2 sm:px-4 border-b-2 font-serif font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
+                    activeTab === "overview"
+                      ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <BookOpenIcon className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
+                    <span>Overview</span>
+                  </div>
+                </button>
 
-            {/* Preferences Tab */}
-            {activeTab === "preferences" && userData && (
-              <PreferencesEditor
-                preferences={userData.preferences}
-                onUpdate={updatePreferences}
-              />
-            )}
+                <button
+                  onClick={() => setActiveTab("library")}
+                  className={`group py-3 sm:py-4 px-2 sm:px-4 border-b-2 font-serif font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
+                    activeTab === "library"
+                      ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <BookOpenIcon className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
+                    <span>Library</span>
+                    <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-primary-500 text-white text-xs rounded-full font-bold">
+                      {userBooks.length}
+                    </span>
+                  </div>
+                </button>
 
-            {/* Ratings Tab */}
-            {activeTab === "ratings" && userData && (
-              <RatingsDisplay ratings={userData.ratings} />
-            )}
+                <button
+                  onClick={() => setActiveTab("preferences")}
+                  className={`group py-3 sm:py-4 px-2 sm:px-4 border-b-2 font-serif font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
+                    activeTab === "preferences"
+                      ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <Cog6ToothIcon className="w-4 h-4 sm:w-5 sm:h-5 group-hover:rotate-90 transition-transform duration-500" />
+                    <span>Preferences</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("ratings")}
+                  className={`group py-3 sm:py-4 px-2 sm:px-4 border-b-2 font-serif font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
+                    activeTab === "ratings"
+                      ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <StarIcon className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
+                    <span>My Ratings</span>
+                  </div>
+                </button>
+              </nav>
+            </div>
+
+            <div className="p-4 sm:p-6 md:p-8">
+              {/* Overview Tab */}
+              {activeTab === "overview" && (
+                <div className="space-y-6 sm:space-y-8">
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                    <div className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-4 sm:p-6 border border-primary-200 dark:border-primary-700 hover:shadow-lg transition-shadow">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-500 rounded-lg flex items-center justify-center">
+                          <BookOpenIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                        </div>
+                        <div className="ml-3 sm:ml-4">
+                          <p className="text-2xl sm:text-3xl font-serif font-bold text-primary-600 dark:text-primary-400">
+                            {userBooks.length}
+                          </p>
+                          <p className="text-primary-800 dark:text-primary-200 font-serif text-sm sm:text-base">
+                            Books in Library
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-secondary-50 dark:bg-secondary-900/20 rounded-xl p-4 sm:p-6 border border-secondary-200 dark:border-secondary-700 hover:shadow-lg transition-shadow">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-secondary-500 rounded-lg flex items-center justify-center">
+                          <StarSolidIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                        </div>
+                        <div className="ml-3 sm:ml-4">
+                          <p className="text-2xl sm:text-3xl font-serif font-bold text-secondary-600 dark:text-secondary-400">
+                            {
+                              userBooks.filter((b) => b.status === "read")
+                                .length
+                            }
+                          </p>
+                          <p className="text-secondary-800 dark:text-secondary-200 font-serif text-sm sm:text-base">
+                            Books Read
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-accent-50 dark:bg-accent-900/20 rounded-xl p-4 sm:p-6 border border-accent-200 dark:border-accent-700 hover:shadow-lg transition-shadow">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-accent-500 rounded-lg flex items-center justify-center">
+                          <HeartSolidIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                        </div>
+                        <div className="ml-3 sm:ml-4">
+                          <p className="text-2xl sm:text-3xl font-serif font-bold text-accent-600 dark:text-accent-400">
+                            {userBooks.filter((b) => b.isLiked).length}
+                          </p>
+                          <p className="text-accent-800 dark:text-accent-200 font-serif text-sm sm:text-base">
+                            Favorite Books
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-xl p-4 sm:p-6 border border-primary-200 dark:border-primary-700 hover:shadow-lg transition-shadow">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
+                          <SparklesSolidIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                        </div>
+                        <div className="ml-3 sm:ml-4">
+                          <p className="text-2xl sm:text-3xl font-serif font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent dark:from-primary-400 dark:to-secondary-400">
+                            {
+                              (
+                                userData?.preferences?.genres ||
+                                userPreferences?.genres ||
+                                []
+                              ).length
+                            }
+                          </p>
+                          <p className="text-primary-800 dark:text-primary-200 font-serif text-sm sm:text-base">
+                            Favorite Genres
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent Activity */}
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                      Recent Activity
+                    </h3>
+                    <div className="space-y-2 sm:space-y-3">
+                      {userBooks
+                        .sort(
+                          (a, b) =>
+                            new Date(b.dateAdded).getTime() -
+                            new Date(a.dateAdded).getTime()
+                        )
+                        .slice(0, 5)
+                        .map((book) => (
+                          <div
+                            key={book.id}
+                            className="flex items-center space-x-3 p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                          >
+                            <img
+                              src={book.cover}
+                              alt={book.title}
+                              className="w-10 h-12 sm:w-12 sm:h-16 object-cover rounded"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">
+                                {book.title}
+                              </h4>
+                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
+                                by {book.author}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-500">
+                                Added{" "}
+                                {new Date(book.dateAdded).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <span
+                                className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+                                  book.status === "read"
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                                    : book.status === "currently-reading"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                                    : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
+                                }`}
+                              >
+                                {book.status === "want-to-read"
+                                  ? "Want to Read"
+                                  : book.status === "currently-reading"
+                                  ? "Reading"
+                                  : "Read"}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      {userBooks.length === 0 && (
+                        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                          No books in your library yet. Start discovering books
+                          to add them!
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Favorite Genres Display */}
+                  {(userData?.preferences?.genres ||
+                    userPreferences?.genres) && (
+                    <div>
+                      <h3 className="text-xl font-serif font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+                        <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center mr-3">
+                          <SparklesSolidIcon className="w-4 h-4 text-white" />
+                        </div>
+                        Your Enchanted Genres
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {(
+                          userData?.preferences?.genres ||
+                          userPreferences?.genres ||
+                          []
+                        ).map((genre) => (
+                          <div
+                            key={genre}
+                            className="group relative bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border border-primary-200 dark:border-primary-700 rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:scale-105"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-primary-100/20 to-secondary-100/20 dark:from-primary-800/20 dark:to-secondary-800/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="relative text-center">
+                              <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                                <span className="text-white font-serif font-bold text-lg">
+                                  {genre.charAt(0)}
+                                </span>
+                              </div>
+                              <h4 className="font-serif font-semibold text-gray-900 dark:text-white text-sm">
+                                {genre}
+                              </h4>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Library Tab */}
+              {activeTab === "library" && (
+                <LibraryDisplay userBooks={userBooks} />
+              )}
+
+              {/* Preferences Tab */}
+              {activeTab === "preferences" && userData && (
+                <PreferencesEditor
+                  preferences={userData.preferences}
+                  onUpdate={updatePreferences}
+                />
+              )}
+
+              {/* Ratings Tab */}
+              {activeTab === "ratings" && userData && (
+                <RatingsDisplay ratings={userData.ratings} />
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -698,7 +908,7 @@ function PreferencesEditor({
               onClick={() => toggleTopic(topic)}
               className={`p-3 rounded-lg text-sm font-medium transition-colors ${
                 editedPreferences.topics.includes(topic)
-                  ? "bg-blue-600 text-white"
+                  ? "bg-secondary-400 text-white"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
               }`}
             >

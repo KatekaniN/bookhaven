@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import {
@@ -13,14 +14,42 @@ import {
   UserGroupIcon,
   HeartIcon,
   StarIcon,
+  BookOpenIcon,
+  DevicePhoneMobileIcon,
+  SpeakerWaveIcon,
 } from "@heroicons/react/24/outline";
-import BookRatingStep from "../../components/onboarding/BookRatingStep";
 import {
   useOnboardingState,
   useUserData,
   useHydratedStore,
   useAppStore,
 } from "../../stores/useAppStore";
+
+// Dynamic imports for heavy components
+const BookRatingStep = dynamic(
+  () => import("../../components/onboarding/BookRatingStep"),
+  {
+    loading: () => (
+      <div className="space-y-6">
+        <div className="text-center">
+          <div className="animate-pulse">
+            <div className="h-16 w-16 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mb-4"></div>
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-64 mx-auto"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-80 mx-auto"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[...Array(8)].map((_, i) => (
+            <div
+              key={i}
+              className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"
+            ></div>
+          ))}
+        </div>
+      </div>
+    ),
+  }
+);
 
 interface UserPreference {
   id: string;
@@ -32,6 +61,10 @@ interface UserPreference {
   rating: number;
   isLiked: boolean;
   weight: number;
+  // Additional book details for display purposes
+  title?: string;
+  author?: string;
+  cover?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -88,14 +121,29 @@ const READING_PACES = [
   { value: "fast", label: "Speed Reader", description: "4+ books per month" },
 ];
 
+// Icon mapping for book formats
+const getFormatIcon = (format: string) => {
+  const iconClass = "w-5 h-5";
+  switch (format) {
+    case "physical":
+      return <BookOpenIcon className={iconClass} />;
+    case "ebook":
+      return <DevicePhoneMobileIcon className={iconClass} />;
+    case "audiobook":
+      return <SpeakerWaveIcon className={iconClass} />;
+    default:
+      return <BookOpenIcon className={iconClass} />;
+  }
+};
+
 const BOOK_FORMATS = [
-  { value: "physical", label: "Physical Books", emoji: "📖" },
-  { value: "ebook", label: "E-books", emoji: "📱" },
-  { value: "audiobook", label: "Audiobooks", emoji: "🎧" },
+  { value: "physical", label: "Physical Books" },
+  { value: "ebook", label: "E-books" },
+  { value: "audiobook", label: "Audiobooks" },
 ];
 
 export default function OnboardingPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   // Zustand state
@@ -133,10 +181,11 @@ export default function OnboardingPage() {
 
   // Handle session-based redirects
   useEffect(() => {
-    if (!session) {
-      router.push("/auth/signin");
+    if (status === "unauthenticated") {
+      const t = setTimeout(() => router.push("/auth/signin"), 400);
+      return () => clearTimeout(t);
     }
-  }, [session, router]);
+  }, [status, router]);
 
   const handleGenreToggle = (genre: string) => {
     setData((prev) => ({
@@ -200,8 +249,9 @@ export default function OnboardingPage() {
       const bookRatings = data.bookRatings.map((rating) => ({
         id: rating.id,
         bookId: rating.bookId || "",
-        title: "", // Will be filled from API data
-        author: "", // Will be filled from API data
+        title: rating.title || "", // Now available from enhanced UserPreference
+        author: rating.author || "", // Now available from enhanced UserPreference
+        cover: rating.cover || "", // Now available from enhanced UserPreference
         rating: rating.rating,
         isLiked: rating.isLiked,
         weight: rating.weight,
@@ -236,6 +286,9 @@ export default function OnboardingPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...(process.env.NODE_ENV === "development" && session?.user?.email
+              ? { "x-user-email": session.user.email }
+              : {}),
           },
           body: JSON.stringify(onboardingData),
         });
@@ -412,12 +465,34 @@ export default function OnboardingPage() {
 
       case 2:
         return (
-          <BookRatingStep
-            selectedGenres={data.favoriteGenres}
-            onRatingsChange={handleRatingsChange}
-            initialBookRatings={data.bookRatings}
-            initialAuthorRatings={data.authorRatings}
-          />
+          <Suspense
+            fallback={
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="animate-pulse">
+                    <div className="h-16 w-16 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mb-4"></div>
+                    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-64 mx-auto"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-80 mx-auto"></div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[...Array(8)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"
+                    ></div>
+                  ))}
+                </div>
+              </div>
+            }
+          >
+            <BookRatingStep
+              selectedGenres={data.favoriteGenres}
+              onRatingsChange={handleRatingsChange}
+              initialBookRatings={data.bookRatings}
+              initialAuthorRatings={data.authorRatings}
+            />
+          </Suspense>
         );
 
       case 3:
@@ -472,7 +547,7 @@ export default function OnboardingPage() {
             <div className="text-center">
               <SparklesIcon className="h-16 w-16 text-primary-500 mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                What's your reading pace?
+                What&apos;s your reading pace?
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
                 This helps us recommend the right amount of content
@@ -520,7 +595,7 @@ export default function OnboardingPage() {
                 What interests you most?
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
-                Select at least 2 activities you'd like to explore
+                Select at least 2 activities you&apos;d like to explore
               </p>
             </div>
 
@@ -575,7 +650,9 @@ export default function OnboardingPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <span className="text-2xl">{format.emoji}</span>
+                      <span className="text-2xl">
+                        {getFormatIcon(format.value)}
+                      </span>
                       <span className="font-medium text-gray-900 dark:text-white">
                         {format.label}
                       </span>
@@ -596,7 +673,7 @@ export default function OnboardingPage() {
   };
 
   // Show loading while hydrating or checking session
-  if (!hasHydrated || !session) {
+  if (!hasHydrated || status === "loading") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center">
@@ -652,7 +729,7 @@ export default function OnboardingPage() {
               Welcome to Book Haven, {session?.user?.name || "Reader"}! 👋
             </h1>
             <p className="text-gray-600 dark:text-gray-300">
-              Let's personalize your reading experience in just a few steps
+              Let&apos;s personalize your reading experience in just a few steps
             </p>
           </div>
         )}

@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"app\\\\my-books\\\\page.tsx -> ../../components/books/BookCard\":{\"id\":\"app\\\\my-books\\\\page.tsx -> ../../components/books/BookCard\",\"files\":[\"static/chunks/_app-pages-browser_components_books_BookCard_tsx.js\"]},\"app\\\\profile\\\\page.tsx -> ../../components/home/PersonalizedRecommendations\":{\"id\":\"app\\\\profile\\\\page.tsx -> ../../components/home/PersonalizedRecommendations\",\"files\":[\"static/chunks/_app-pages-browser_components_home_PersonalizedRecommendations_tsx.js\"]}}"

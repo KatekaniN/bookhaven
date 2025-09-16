@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { BookCard } from "../books/BookCard";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
@@ -19,6 +19,10 @@ interface RecommendedBook {
   recommendation_reason: string;
 }
 
+// Cache configuration
+const CACHE_KEY = "personalized_recommendations_cache";
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
 interface PersonalizedRecommendationsProps {
   limit?: number;
   className?: string;
@@ -34,53 +38,112 @@ export function PersonalizedRecommendations({
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
 
-  const fetchRecommendations = async (forceRefresh = false) => {
-    setLoading(true);
-    setError(null);
+  const fetchRecommendations = useCallback(
+    async (forceRefresh = false) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const params = new URLSearchParams({
-        limit: limit.toString(),
-        ...(forceRefresh && {
-          refresh: "true",
-          timestamp: Date.now().toString(),
-        }),
-      });
-
-      const response = await fetch(`/api/recommendations?${params}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch recommendations");
-      }
-
-      const result = await response.json();
-      setRecommendations(result.data || []);
-      setLastRefreshTime(new Date());
-    } catch (err) {
-      console.error("Error fetching recommendations:", err);
-      setError(err instanceof Error ? err.message : "Unknown error");
-
-      // Fallback to generic recommendations
       try {
-        const fallbackBooks = await OpenLibraryAPI.getTrendingBooks(limit);
-        const formattedBooks = fallbackBooks.docs.map((book) => ({
-          ...book,
-          recommendation_score: 0.5,
-          recommendation_reason: "Popular book",
-        }));
-        setRecommendations(formattedBooks);
-        setLastRefreshTime(new Date());
-      } catch (fallbackError) {
-        console.error("Fallback recommendations failed:", fallbackError);
+        // Check cache first (unless forcing refresh)
+        if (!forceRefresh) {
+          const cached = localStorage.getItem(CACHE_KEY);
+          if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            // Treat empty cached data as invalid to avoid showing "no recommendations" indefinitely
+            const cacheIsFresh = Date.now() - timestamp < CACHE_DURATION;
+            if (cacheIsFresh && Array.isArray(data) && data.length > 0) {
+              console.log(
+                "📖 PersonalizedRecommendations: Cache hit - using stored data"
+              );
+              setRecommendations(data);
+              setLastRefreshTime(new Date(timestamp));
+              setLoading(false);
+              return;
+            } else {
+              console.log(
+                "📖 PersonalizedRecommendations: Cache expired - fetching fresh data"
+              );
+              // If cache was empty, force a fresh pull
+            }
+          }
+        } else {
+          console.log(
+            "📖 PersonalizedRecommendations: Force refresh - fetching fresh data"
+          );
+        }
+
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          ...(forceRefresh && {
+            refresh: "true",
+            timestamp: Date.now().toString(),
+          }),
+        });
+
+        const response = await fetch(`/api/recommendations?${params}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(process.env.NODE_ENV === "development" && session?.user?.email
+              ? { "x-user-email": session.user.email }
+              : {}),
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch recommendations");
+        }
+
+        const result = await response.json();
+        const freshData = result.data || [];
+        const currentTime = Date.now();
+
+        if (freshData.length === 0) {
+          // No fallback: honor server response for live-only data
+          setRecommendations([]);
+          setLastRefreshTime(new Date(currentTime));
+          // Clear cache to avoid persisting empty results for long
+          localStorage.removeItem(CACHE_KEY);
+        } else {
+          setRecommendations(freshData);
+          setLastRefreshTime(new Date(currentTime));
+          // Cache the results
+          localStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({
+              data: freshData,
+              timestamp: currentTime,
+            })
+          );
+
+          console.log(
+            "📖 PersonalizedRecommendations: Fresh data cached successfully"
+          );
+        }
+      } catch (err) {
+        console.error("Error fetching recommendations:", err);
+        setError(err instanceof Error ? err.message : "Unknown error");
+
+        // No fallback: keep UI empty to reflect lack of live data
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
+    },
+    [limit, session?.user?.email]
+  );
+
+  // Get initial timestamp from cache for auto-refresh synchronization
+  const getInitialTimestamp = () => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { timestamp } = JSON.parse(cached);
+        return timestamp;
+      }
+    } catch (error) {
+      console.warn("Failed to get initial timestamp from cache:", error);
     }
+    return undefined;
   };
 
   // Auto-refresh hook - refreshes every hour
@@ -88,17 +151,22 @@ export function PersonalizedRecommendations({
     interval: 60 * 60 * 1000, // 1 hour
     enabled: !!session?.user?.email,
     onRefresh: () => fetchRecommendations(true),
+    initialTimestamp: getInitialTimestamp(),
   });
 
   useEffect(() => {
     if (session?.user?.email) {
       fetchRecommendations();
     }
-  }, [session, limit]);
+  }, [session, limit, fetchRecommendations]);
 
+  const normalizeId = (key: string) =>
+    key?.startsWith("/")
+      ? key.slice(1)
+      : key || Math.random().toString(36).slice(2);
   const formatBookForCard = (book: RecommendedBook) => {
     return {
-      id: book.key,
+      id: normalizeId(book.key),
       title: book.title,
       author: book.author_name?.[0] || "Unknown Author",
       authors: book.author_name || [],
@@ -194,7 +262,7 @@ export function PersonalizedRecommendations({
           <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-8 border border-white/20 dark:border-gray-700/20 shadow-lg">
             <LoadingSpinner />
             <span className="ml-3 text-gray-600 dark:text-gray-400">
-              Finding books you'll love...
+              Finding books you&apos;ll love...
             </span>
           </div>
         </div>
@@ -269,7 +337,10 @@ export function PersonalizedRecommendations({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {recommendations.map((book) => (
-          <div key={book.key} className="relative flex flex-col items-center">
+          <div
+            key={`${book.key}-${book.recommendation_reason ?? ""}`}
+            className="relative flex flex-col items-center"
+          >
             <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg border border-white/20 dark:border-gray-700/20 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 overflow-hidden">
               <BookCard book={formatBookForCard(book)} />
             </div>

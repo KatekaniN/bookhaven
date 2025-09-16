@@ -5,9 +5,13 @@ import { Providers } from "./providers";
 import { Navigation } from "../components/layout/Navigation";
 import { AuthGuard } from "../components/auth/AuthGuard";
 import OnboardingDataSync from "../components/auth/OnboardingDataSync";
+import UserDataInitializer from "../components/auth/UserDataInitializer";
 import DataMigration from "../components/utils/DataMigration";
+import OfflineSync from "../components/utils/OfflineSync";
 import { SessionDebug } from "../components/debug/SessionDebug";
 import { OnboardingDebug } from "../components/debug/OnboardingDebug";
+import { SyncStatusDebug } from "../components/debug/SyncStatusDebug";
+import { AuthFlowDebug } from "../components/debug/AuthFlowDebug";
 import { CustomCursor } from "../components/ui/CustomCursor";
 import { Toaster } from "react-hot-toast";
 
@@ -86,12 +90,14 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#B7A3CA" />
       </head>
       <body
-        className={`${inter.className} bg-white dark:bg-gray-900 text-gray-900 dark:text-white`}
+        className={`font-serif bg-white dark:bg-gray-900 text-gray-900 dark:text-white`}
       >
         <Providers>
           <CustomCursor />
           <OnboardingDataSync />
+          <UserDataInitializer />
           <DataMigration />
+          <OfflineSync />
           <AuthGuard>
             <div className="min-h-screen flex flex-col">
               <Navigation />
@@ -109,7 +115,9 @@ export default function RootLayout({
             />
           </AuthGuard>
           <OnboardingDebug />
-          {/* <SessionDebug /> */}
+          <SessionDebug />
+          <SyncStatusDebug />
+          <AuthFlowDebug />
         </Providers>
       </body>
     </html>

@@ -30,12 +30,18 @@ export const clearStoredOnboardingData = () => {
   localStorage.removeItem("onboarding_data");
 };
 
-export const saveOnboardingDataToAPI = async (data: OnboardingData) => {
+export const saveOnboardingDataToAPI = async (
+  data: OnboardingData,
+  userEmail?: string
+) => {
   try {
     const response = await fetch("/api/user/preferences", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(process.env.NODE_ENV === "development" && userEmail
+          ? { "x-user-email": userEmail }
+          : {}),
       },
       body: JSON.stringify(data),
     });

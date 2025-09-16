@@ -1,5 +1,6 @@
 const OPEN_LIBRARY_BASE_URL = "https://openlibrary.org";
 const COVERS_BASE_URL = "https://covers.openlibrary.org/b";
+const API_PROXY_URL = "/api/openlibrary"; // Prefer proxy in the browser only
 
 export interface OpenLibraryBook {
   key: string;
@@ -42,46 +43,86 @@ export interface BookDetails {
 }
 
 export class OpenLibraryAPI {
+  private static normalizeSubjectKey(input: string): string {
+    return input
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "");
+  }
+  private static slugSubject(genre: string): string {
+    // Convert to OpenLibrary subject_key format (lowercase underscores)
+    return genre
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  }
   static async searchBooks(
     query: string,
     limit: number = 20,
     offset: number = 0,
     sortBy: string = "relevance"
   ): Promise<BookSearchResponse> {
+    // // Ensure query is a proper string
+    const q = String(query ?? "").trim();
     const searchParams = new URLSearchParams({
-      q: query,
+      q,
       limit: limit.toString(),
       offset: offset.toString(),
-      fields:
-        "key,title,author_name,first_publish_year,isbn,cover_i,publisher,language,subject,ratings_average,ratings_count,want_to_read_count,currently_reading_count,already_read_count",
+      // Include subject field for better genre categorization
+      fields: "key,title,author_name,first_publish_year,cover_i,subject",
     });
+    // Don't add sort parameter - it might cause 500 errors
 
-    // Add sort parameter if not relevance
-    if (sortBy !== "relevance") {
-      const sortMap: { [key: string]: string } = {
-        title_asc: "title asc",
-        title_desc: "title desc",
-        year_newest: "new",
-        year_oldest: "old",
-        rating_highest: "rating desc",
-        popularity_highest: "want_to_read_count desc",
-      };
-
-      const sortValue = sortMap[sortBy];
-      if (sortValue) {
-        searchParams.append("sort", sortValue);
+    // Server vs browser: in browser use our proxy; on the server try OpenLibrary and fall back to proxy on 5xx
+    const isServer = typeof window === "undefined";
+    const primaryEndpoint = isServer
+      ? `${OPEN_LIBRARY_BASE_URL}/search.json`
+      : API_PROXY_URL;
+    const fallbackEndpoint = API_PROXY_URL;
+    const url = `${primaryEndpoint}?${searchParams.toString()}`;
+    // Debug log only on server to avoid noisy client logs
+    if (isServer) {
+      console.log(`🔗 OpenLibrary fetch: ${url}`);
+    }
+    // Simple retry with no aggressive timeouts
+    const maxRetries = 2;
+    let attempt = 0;
+    let lastErr: any = null;
+    while (attempt <= maxRetries) {
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          return response.json();
+        }
+        if (isServer && response.status >= 500) {
+          // Try proxy fallback once on server
+          const proxyUrl = `${fallbackEndpoint}?${searchParams.toString()}`;
+          const proxyResp = await fetch(proxyUrl);
+          if (proxyResp.ok) return proxyResp.json();
+        }
+        // Retry on 5xx
+        if (response.status >= 500 && response.status < 600) {
+          const delay =
+            250 * Math.pow(2, attempt) + Math.floor(Math.random() * 120);
+          await new Promise((r) => setTimeout(r, delay));
+          attempt++;
+          continue;
+        }
+        throw new Error(
+          `Search failed: ${response.status} ${response.statusText}`
+        );
+      } catch (e: any) {
+        lastErr = e;
+        if (attempt >= maxRetries) break;
+        const delay =
+          250 * Math.pow(2, attempt) + Math.floor(Math.random() * 120);
+        await new Promise((r) => setTimeout(r, delay));
+        attempt++;
       }
     }
-
-    const response = await fetch(
-      `${OPEN_LIBRARY_BASE_URL}/search.json?${searchParams}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Search failed: ${response.statusText}`);
-    }
-
-    return response.json();
+    throw new Error(`Search failed: ${lastErr?.message || "Unknown error"}`);
   }
 
   static async getBookDetails(bookKey: string): Promise<BookDetails> {
@@ -113,7 +154,12 @@ export class OpenLibraryAPI {
     limit: number = 20,
     offset: number = 0
   ): Promise<BookSearchResponse> {
-    return this.searchBooks(`subject:"${genre}"`, limit, offset, "relevance");
+    // Prefer subject-based search to keep results relevant to the genre
+    // Use a conservative query that prioritizes subject and falls back to title mentions
+    const g = genre.trim();
+    const subjectKey = this.slugSubject(g);
+    const query = `subject:\"${g}\" OR subject_key:${subjectKey} OR title:\"${g}\"`;
+    return this.searchBooks(query, limit, offset, "relevance");
   }
 
   static async searchByAuthor(
@@ -121,7 +167,7 @@ export class OpenLibraryAPI {
     limit: number = 20,
     offset: number = 0
   ): Promise<BookSearchResponse> {
-    return this.searchBooks(`author:"${author}"`, limit, offset, "relevance");
+    return this.searchBooks(author, limit, offset, "relevance");
   }
 
   static async searchByISBN(isbn: string): Promise<BookSearchResponse> {
@@ -131,33 +177,19 @@ export class OpenLibraryAPI {
   static async getTrendingBooks(
     limit: number = 20
   ): Promise<BookSearchResponse> {
-    // Use a search for popular books (this is a simplified approach)
-    return this.searchBooks("*", limit, 0, "popularity_highest");
+    // Use a simple term to avoid heavy filters that might 500
+    return this.searchBooks("fiction", limit, 0, "relevance");
   }
 
   static async getPopularBooksByGenre(
     genre: string,
     limit: number = 20
   ): Promise<BookSearchResponse> {
-    // Search for popular books in genre, sorted by want-to-read count
-    const searchParams = new URLSearchParams({
-      q: `subject:"${genre}" AND has_fulltext:true`,
-      limit: limit.toString(),
-      offset: "0",
-      sort: "want_to_read_count desc",
-      fields:
-        "key,title,author_name,first_publish_year,isbn,cover_i,publisher,language,subject,ratings_average,ratings_count,want_to_read_count,currently_reading_count,already_read_count,edition_count",
-    });
-
-    const response = await fetch(
-      `${OPEN_LIBRARY_BASE_URL}/search.json?${searchParams}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Search failed: ${response.statusText}`);
-    }
-
-    return response.json();
+    // Use the same subject-focused approach as searchByGenre
+    const g = genre.trim();
+    const subjectKey = this.slugSubject(g);
+    const query = `subject:\"${g}\" OR subject_key:${subjectKey}`;
+    return this.searchBooks(query, limit, 0, "relevance");
   }
 
   static formatBookData(book: OpenLibraryBook) {

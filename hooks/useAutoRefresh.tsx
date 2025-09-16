@@ -6,15 +6,26 @@ interface UseAutoRefreshOptions {
   interval?: number; // in milliseconds
   enabled?: boolean;
   onRefresh: () => void | Promise<void>;
+  initialTimestamp?: number | null; // Allow syncing with existing cache timestamp
 }
 
 export function useAutoRefresh({
   interval = 60 * 60 * 1000, // 1 hour by default
   enabled = true,
   onRefresh,
+  initialTimestamp,
 }: UseAutoRefreshOptions) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastRefreshRef = useRef<number>(Date.now());
+  const lastRefreshRef = useRef<number>(
+    initialTimestamp && initialTimestamp > 0 ? initialTimestamp : Date.now()
+  );
+
+  // Update last refresh timestamp when initialTimestamp changes
+  useEffect(() => {
+    if (initialTimestamp && initialTimestamp > 0) {
+      lastRefreshRef.current = initialTimestamp;
+    }
+  }, [initialTimestamp]);
 
   const clearExistingInterval = useCallback(() => {
     if (intervalRef.current) {

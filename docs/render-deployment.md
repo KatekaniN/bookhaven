@@ -32,14 +32,14 @@ git push origin main
 - **Build Command**: `npm ci && npm run build`
 - **Start Command**: `npm start`
 
-### 4. Environment Variables
+### 4. Environment Variables (Initial Setup)
 
-Add these environment variables in Render dashboard:
+Add these environment variables in Render dashboard for the initial deployment:
 
 #### Required Variables:
 
 - `NODE_ENV`: `production`
-- `NEXTAUTH_URL`: `https://your-app-name.onrender.com`
+- `NEXTAUTH_URL`: `https://placeholder.onrender.com` (⚠️ **TEMPORARY** - will update after deployment)
 - `NEXTAUTH_SECRET`: Generate a random string (Render can auto-generate)
 
 #### Google OAuth:
@@ -60,26 +60,42 @@ Add these environment variables in Render dashboard:
 
 - `NEXT_PUBLIC_OPEN_LIBRARY_API`: `https://openlibrary.org`
 
-### 5. Update Google OAuth Settings
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Navigate to APIs & Services → Credentials
-3. Edit your OAuth 2.0 Client ID
-4. Add your Render domain to "Authorized redirect URIs":
-   - `https://your-app-name.onrender.com/api/auth/callback/google`
-5. Add your domain to "Authorized JavaScript origins":
-   - `https://your-app-name.onrender.com`
-
-### 6. Deploy
+### 6. Deploy (First Time)
 
 1. Click "Create Web Service"
 2. Render will automatically:
    - Clone your repository
    - Install dependencies
-   - Build your application
+   - Build your application (this may fail initially due to OAuth config)
    - Deploy to a public URL
+3. **Copy your assigned URL** from Render dashboard (e.g., `https://bookhaven-xyz123.onrender.com`)
 
-### 7. Post-Deployment Checklist
+### 7. Update Configuration with Real URL
+
+#### 7.1 Update Render Environment Variables:
+
+1. Go to your service → Environment tab
+2. Update `NEXTAUTH_URL` to your actual Render URL
+3. Save changes (this will trigger a redeploy)
+
+#### 7.2 Update Google OAuth Settings:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Navigate to APIs & Services → Credentials
+3. Edit your OAuth 2.0 Client ID
+4. Add your Render domain to "Authorized redirect URIs":
+   - `https://your-actual-render-url.onrender.com/api/auth/callback/google`
+5. Add your domain to "Authorized JavaScript origins":
+   - `https://your-actual-render-url.onrender.com`
+
+### 8. Final Deployment
+
+After updating both Render environment variables and Google OAuth:
+
+1. Render will automatically redeploy (or trigger manually)
+2. Your app should now work with authentication
+
+### 9. Post-Deployment Checklist
 
 - [ ] App loads successfully
 - [ ] Google OAuth login works

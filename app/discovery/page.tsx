@@ -502,8 +502,9 @@ export default function DiscoveryPage() {
                         </div>
 
                         {/* Reviews */}
-                        <div className="text-sm text-gray-300 text-center lg:text-left">
-                          ⭐ {book.reviewCount.toLocaleString()} reader reviews
+                        <div className="text-sm text-gray-300 text-center lg:text-left flex items-center justify-center lg:justify-start">
+                          <StarIcon className="w-4 h-4 text-yellow-500 mr-1" />
+                          {book.reviewCount.toLocaleString()} reader reviews
                         </div>
 
                         {/* Action Buttons */}

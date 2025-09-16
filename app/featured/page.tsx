@@ -1,9 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { BookCard } from "../../components/books/BookCard";
+import { useState, useEffect, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { OpenLibraryAPI } from "../../lib/openLibrary";
+
+// Dynamic imports for performance
+const BookCard = dynamic(
+  () =>
+    import("../../components/books/BookCard").then((mod) => ({
+      default: mod.BookCard,
+    })),
+  {
+    loading: () => (
+      <div className="animate-pulse">
+        <div className="h-80 bg-gray-200 dark:bg-gray-700 rounded-lg mb-4"></div>
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+      </div>
+    ),
+  }
+);
 
 interface FeaturedBook {
   key: string;
@@ -17,44 +34,44 @@ interface FeaturedBook {
 }
 
 // Cache key for localStorage
-const FEATURED_BOOKS_CACHE_KEY = 'bookhaven_featured_books';
-const FEATURED_PAGE_CACHE_KEY = 'bookhaven_featured_page';
+const FEATURED_BOOKS_CACHE_KEY = "bookhaven_featured_books";
+const FEATURED_PAGE_CACHE_KEY = "bookhaven_featured_page";
 const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 // Cache management
 const getCachedData = (key: string) => {
-  if (typeof window === 'undefined') return null;
-  
+  if (typeof window === "undefined") return null;
+
   try {
     const cached = localStorage.getItem(key);
     if (!cached) return null;
-    
+
     const { data, timestamp } = JSON.parse(cached);
     const isExpired = Date.now() - timestamp > CACHE_DURATION;
-    
+
     if (isExpired) {
       localStorage.removeItem(key);
       return null;
     }
-    
+
     return data;
   } catch (error) {
-    console.error('Error reading from cache:', error);
+    console.error("Error reading from cache:", error);
     return null;
   }
 };
 
 const setCachedData = (key: string, data: any) => {
-  if (typeof window === 'undefined') return;
-  
+  if (typeof window === "undefined") return;
+
   try {
     const cacheData = {
       data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     localStorage.setItem(key, JSON.stringify(cacheData));
   } catch (error) {
-    console.error('Error writing to cache:', error);
+    console.error("Error writing to cache:", error);
   }
 };
 
@@ -70,7 +87,7 @@ export default function FeaturedPage() {
     // Try to load cached data first
     const cachedBooks = getCachedData(FEATURED_BOOKS_CACHE_KEY);
     const cachedPage = getCachedData(FEATURED_PAGE_CACHE_KEY);
-    
+
     if (cachedBooks && Array.isArray(cachedBooks) && cachedBooks.length > 0) {
       setBooks(cachedBooks);
       setCurrentPage(cachedPage || 1);
@@ -105,15 +122,14 @@ export default function FeaturedPage() {
 
       const result = await response.json();
       const newBooks = result.data || [];
-      
+
       setBooks(newBooks);
       setCurrentPage(1); // Reset to first page on refresh
       setInitialLoad(false);
-      
+
       // Cache the new data
       setCachedData(FEATURED_BOOKS_CACHE_KEY, newBooks);
       setCachedData(FEATURED_PAGE_CACHE_KEY, 1);
-      
     } catch (err) {
       console.error("Error fetching featured books:", err);
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -122,21 +138,20 @@ export default function FeaturedPage() {
       try {
         const fallbackResult = await OpenLibraryAPI.getTrendingBooks(24);
         const fallbackBooks = fallbackResult.docs
-          .filter(book => book.cover_i && book.author_name)
+          .filter((book) => book.cover_i && book.author_name)
           .slice(0, 24)
-          .map(book => ({
+          .map((book) => ({
             ...book,
             featured_reason: "Popular choice",
-            featured_score: 0.7
+            featured_score: 0.7,
           }));
-        
+
         setBooks(fallbackBooks);
         setInitialLoad(false);
-        
+
         // Cache fallback data
         setCachedData(FEATURED_BOOKS_CACHE_KEY, fallbackBooks);
         setCachedData(FEATURED_PAGE_CACHE_KEY, 1);
-        
       } catch (fallbackError) {
         console.error("Fallback featured books failed:", fallbackError);
       }
@@ -174,7 +189,7 @@ export default function FeaturedPage() {
 
   const goToPage = (page: number) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   if (loading) {
@@ -201,7 +216,8 @@ export default function FeaturedPage() {
             Featured Books
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400">
-            Handpicked selections from our community - the best books across all genres
+            Handpicked selections from our community - the best books across all
+            genres
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
             Showing {books.length} featured books
@@ -234,7 +250,17 @@ export default function FeaturedPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-8">
               {currentBooks.map((book: FeaturedBook) => (
                 <div key={book.key} className="flex flex-col">
-                  <BookCard book={formatBookForCard(book)} />
+                  <Suspense
+                    fallback={
+                      <div className="animate-pulse">
+                        <div className="h-80 bg-gray-200 dark:bg-gray-700 rounded-lg mb-4"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                      </div>
+                    }
+                  >
+                    <BookCard book={formatBookForCard(book)} />
+                  </Suspense>
                   {book.featured_reason && (
                     <div className="mt-2 px-2 py-1 bg-primary-100 dark:bg-primary-900 rounded-full text-xs text-primary-700 dark:text-primary-300 inline-block max-w-fit mx-auto">
                       {book.featured_reason}
@@ -254,7 +280,7 @@ export default function FeaturedPage() {
                 >
                   Previous
                 </button>
-                
+
                 {Array.from({ length: totalPages }, (_, i) => (
                   <button
                     key={i + 1}

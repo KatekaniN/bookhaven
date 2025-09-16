@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 import { BookCard } from "../books/BookCard";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { OpenLibraryAPI } from "../../lib/openLibrary";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
+import { useDailyRefresh } from "../../lib/dailyRefresh";
 import {
   HeartIcon,
   ChatBubbleLeftIcon,
@@ -49,7 +51,7 @@ interface FeedBook {
 }
 
 const CACHE_KEY = "bookfeed_cache";
-const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes for variety in content
 
 export function BookFeed() {
   const [books, setBooks] = useState<FeedBook[]>([]);
@@ -62,38 +64,73 @@ export function BookFeed() {
   const [isBeginning, setIsBeginning] = useState(true);
   const [isEnd, setIsEnd] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  const { checkAndRefresh, getDailyRandomOffset } = useDailyRefresh();
   const swiperRef = useRef<any>(null);
 
-  const fetchDiscoverFeed = async (forceRefresh = false) => {
+  const fetchDiscoverFeed = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
 
     try {
+      // Check for daily refresh
+      const refreshedToday = checkAndRefresh();
+      const shouldForceRefresh = forceRefresh || refreshedToday;
+
       // Check cache first (unless forcing refresh)
-      if (!forceRefresh) {
+      if (!shouldForceRefresh) {
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
           const { data, timestamp } = JSON.parse(cached);
           if (Date.now() - timestamp < CACHE_DURATION) {
+            console.log("📚 BookFeed: Cache hit - using stored data");
             setBooks(data);
+            setLastRefreshTime(new Date(timestamp));
             setLoading(false);
             return;
+          } else {
+            console.log("📚 BookFeed: Cache expired - fetching fresh data");
           }
         }
+      } else {
+        console.log("📚 BookFeed: Force refresh - fetching fresh data");
       }
 
       // Fetch fresh data from multiple genres for variety
-      const genres = [
+      const allGenres = [
         "fiction",
         "mystery",
         "romance",
         "science fiction",
         "fantasy",
+        "thriller",
+        "historical fiction",
+        "literary fiction",
+        "horror",
+        "biography",
+        "young adult",
+        "contemporary",
+        "adventure",
       ];
-      const randomGenres = genres.sort(() => 0.5 - Math.random()).slice(0, 3);
 
-      const bookPromises = randomGenres.map((genre) =>
-        OpenLibraryAPI.searchBooks(genre, 5, Math.floor(Math.random() * 20))
+      // Use date-based seeding for consistent daily variety
+      const today = new Date().toDateString();
+      const dailySeed = today.split(" ").join("").charCodeAt(0);
+
+      // Shuffle genres based on daily seed for consistent but changing daily selection
+      const shuffledGenres = allGenres.sort((a, b) => {
+        const aCode = a.charCodeAt(0) + dailySeed;
+        const bCode = b.charCodeAt(0) + dailySeed;
+        return (aCode % 100) - (bCode % 100);
+      });
+
+      const selectedGenres = shuffledGenres.slice(0, 4); // Pick 4 different genres each day
+
+      const bookPromises = selectedGenres.map((genre, index) =>
+        OpenLibraryAPI.searchBooks(
+          genre,
+          6,
+          Math.floor((Math.random() + index) * 20) + (dailySeed % 15) // Date-based offset for daily variety
+        )
       );
 
       const results = await Promise.all(bookPromises);
@@ -102,7 +139,7 @@ export function BookFeed() {
       // Filter and format books
       const validBooks = allBooks
         .filter((book) => book.cover_i && book.author_name?.[0] && book.title)
-        .slice(0, 6) // Get 6 books for variety
+        .slice(0, 8) // Get 8 books for more variety
         .map((book) => {
           const primarySubject = book.subject?.[0] || "Fiction";
 
@@ -117,17 +154,20 @@ export function BookFeed() {
           };
         });
 
+      const currentTime = Date.now();
       setBooks(validBooks);
-      setLastRefreshTime(new Date());
+      setLastRefreshTime(new Date(currentTime));
 
       // Cache the results
       localStorage.setItem(
         CACHE_KEY,
         JSON.stringify({
           data: validBooks,
-          timestamp: Date.now(),
+          timestamp: currentTime,
         })
       );
+
+      console.log("📚 BookFeed: Fresh data cached successfully");
     } catch (err) {
       console.error("Error fetching discover feed:", err);
       setError(
@@ -136,18 +176,30 @@ export function BookFeed() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [checkAndRefresh]);
 
-  // Auto-refresh hook - refreshes every hour
+  // Auto-refresh hook - refreshes every 30 minutes
   const { manualRefresh, getFormattedTimeUntilNext } = useAutoRefresh({
-    interval: 60 * 60 * 1000, // 1 hour
+    interval: 30 * 60 * 1000, // 30 minutes for more frequent updates
     enabled: true,
     onRefresh: () => fetchDiscoverFeed(true),
+    initialTimestamp: (() => {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { timestamp } = JSON.parse(cached);
+          return timestamp;
+        }
+      } catch (error) {
+        console.warn("Failed to get initial timestamp from cache:", error);
+      }
+      return undefined;
+    })(),
   });
 
   useEffect(() => {
     fetchDiscoverFeed();
-  }, []);
+  }, [fetchDiscoverFeed]);
 
   const handleRefresh = () => {
     manualRefresh();
@@ -305,10 +357,14 @@ export function BookFeed() {
                   <div className="flex space-x-4">
                     {/* Book cover */}
                     <div className="flex-shrink-0">
-                      <img
+                      <Image
                         src={book.cover}
                         alt={book.title}
+                        width={96}
+                        height={144}
                         className="w-24 h-36 object-cover rounded-lg shadow-sm border border-white/20"
+                        placeholder="blur"
+                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkbHB0eH/xAAVAQEBAQAAAAAAAAAAAAAAAAAAAQIF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R6i+GCXVw=="
                       />
                     </div>
 
@@ -402,7 +458,7 @@ export function BookFeed() {
           <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl border border-white/20 dark:border-gray-700/20 shadow-2xl p-6 max-w-md w-full mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Comments for "{selectedBook.title}"
+                Comments for &ldquo;{selectedBook.title}&rdquo;
               </h3>
               <button
                 onClick={() => setShowCommentModal(false)}
@@ -467,7 +523,7 @@ export function BookFeed() {
           <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl border border-white/20 dark:border-gray-700/20 shadow-2xl p-6 max-w-md w-full mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Share "{selectedBook.title}"
+                Share &ldquo;{selectedBook.title}&rdquo;
               </h3>
               <button
                 onClick={() => setShowShareModal(false)}
