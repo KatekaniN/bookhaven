@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const limitParam = searchParams.get("limit");
     const searchQuery = searchParams.get("q");
 
-  // Order by createdAt to avoid relying on a possibly missing memberCount field
+    // Order by createdAt to avoid relying on a possibly missing memberCount field
     let bookClubsQuery = query(
       collection(db, "bookClubs"),
       orderBy("createdAt", "desc")
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       bookClubsQuery = query(bookClubsQuery, firestoreLimit(limitValue));
     }
 
-  let snapshot = await getDocs(bookClubsQuery);
+    let snapshot = await getDocs(bookClubsQuery);
     let bookClubs: BookClub[] = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
