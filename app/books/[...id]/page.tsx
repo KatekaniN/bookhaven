@@ -14,6 +14,7 @@ import {
   PlusIcon,
   ClockIcon,
   CheckCircleIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline";
 import {
   HeartIcon as HeartSolidIcon,
@@ -23,42 +24,6 @@ import {
 import { useAppStore } from "../../../stores/useAppStore";
 import { OpenLibraryAPI } from "../../../lib/openLibrary";
 import type { Book } from "../../../types";
-
-// Hardcoded discover books for fallback
-const DISCOVER_BOOKS: Book[] = [
-  {
-    id: "discover-1",
-    title: "The Seven Husbands of Evelyn Hugo",
-    author: "Taylor Jenkins Reid",
-    authors: ["Taylor Jenkins Reid"],
-    cover: "https://covers.openlibrary.org/b/isbn/9781501161933-L.jpg",
-    description:
-      "A reclusive Hollywood icon finally tells her story to a young journalist.",
-    pages: 400,
-    publishYear: 2017,
-    subjects: ["Historical Fiction", "Romance"],
-    languages: ["English"],
-    isbn: "9781501161933",
-    rating: 4.2,
-    openLibraryKey: "discover-1",
-  },
-  {
-    id: "discover-2",
-    title: "Where the Crawdads Sing",
-    author: "Delia Owens",
-    authors: ["Delia Owens"],
-    cover: "https://covers.openlibrary.org/b/isbn/9780735219090-L.jpg",
-    description:
-      "A mystery and coming-of-age story set in the marshlands of North Carolina.",
-    pages: 384,
-    publishYear: 2018,
-    subjects: ["Mystery", "Literary Fiction"],
-    languages: ["English"],
-    isbn: "9780735219090",
-    rating: 4.1,
-    openLibraryKey: "discover-2",
-  },
-];
 
 export default function BookDetailPage() {
   const params = useParams();
@@ -94,16 +59,7 @@ export default function BookDetailPage() {
       try {
         console.log("Fetching book with ID:", bookId);
 
-        // First check if it's a discover book (hardcoded)
-        const discoverBook = DISCOVER_BOOKS.find((b) => b.id === bookId);
-        if (discoverBook) {
-          console.log("Found discover book:", discoverBook);
-          setBook(discoverBook);
-          setLoading(false);
-          return;
-        }
-
-        // If not a discover book, try to fetch from Open Library API
+        // Fetch from Open Library API
         if (bookId && (bookId.includes("OL") || bookId.includes("works"))) {
           console.log("Fetching from Open Library API...");
 
@@ -259,7 +215,9 @@ export default function BookDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">📚</div>
+          <div className="flex justify-center mb-4">
+            <BookOpenIcon className="w-16 h-16 text-gray-400" />
+          </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Book Not Found
           </h1>
@@ -267,7 +225,7 @@ export default function BookDetailPage() {
             {error || "The book you're looking for doesn't exist."}
           </p>
           <Link
-            href="/discover"
+            href="/explore"
             className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors"
           >
             Discover Books
@@ -281,7 +239,7 @@ export default function BookDetailPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16">
           <div className="flex items-center justify-between py-4">
             <button
               onClick={() => router.back()}
@@ -327,7 +285,7 @@ export default function BookDetailPage() {
       </div>
 
       {/* Book Details */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Book Cover */}
           <div className="lg:col-span-1">

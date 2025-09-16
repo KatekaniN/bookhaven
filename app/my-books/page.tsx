@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -25,6 +26,21 @@ import {
   StarIcon as StarIconSolid,
 } from "@heroicons/react/24/solid";
 import { useAppStore, UserBook } from "../../stores/useAppStore";
+import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
+
+// Dynamic imports for better performance
+const BookCard = dynamic(
+  () =>
+    import("../../components/books/BookCard").then((mod) => ({
+      default: mod.BookCard,
+    })),
+  {
+    loading: () => (
+      <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg h-96"></div>
+    ),
+    ssr: false,
+  }
+);
 
 export default function MyBooksPage() {
   const { data: session } = useSession();
@@ -42,6 +58,7 @@ export default function MyBooksPage() {
   >("dateAdded");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [progressModalOpen, setProgressModalOpen] = useState<string | null>(
     null
   );
@@ -64,6 +81,8 @@ export default function MyBooksPage() {
   // Initialize filtered books from store
   useEffect(() => {
     setFilteredBooks(userBooks);
+    // Clear image errors when books change
+    setImageErrors(new Set());
   }, [userBooks]);
 
   // Filter and search functionality
@@ -195,6 +214,21 @@ export default function MyBooksPage() {
     setReviewModalOpen(null);
   };
 
+  const handleImageError = (bookId: string) => {
+    setImageErrors((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(bookId);
+      return newSet;
+    });
+  };
+
+  const getImageSrc = (book: UserBook) => {
+    if (imageErrors.has(book.id)) {
+      return "/placeholder-book.jpg";
+    }
+    return book.cover || "/placeholder-book.jpg";
+  };
+
   const statusCounts = getStatusCounts();
 
   const tabs = [
@@ -249,7 +283,7 @@ export default function MyBooksPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 py-6 sm:py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
@@ -350,17 +384,25 @@ export default function MyBooksPage() {
                 className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700"
               >
                 {/* Book Cover */}
-                <div className="relative h-64 bg-gray-100 dark:bg-gray-700">
-                  <Image
-                    src={book.cover}
-                    alt={book.title}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/placeholder-book.svg";
-                    }}
-                  />
+                <div className="relative h-64 bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                  {imageErrors.has(book.id) ? (
+                    // Placeholder with book icon when image fails
+                    <div className="flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
+                      <BookOpenIcon className="h-16 w-16 text-gray-400 dark:text-gray-500 mb-2" />
+                      <span className="text-xs text-gray-500 dark:text-gray-400 text-center px-2">
+                        No Cover Available
+                      </span>
+                    </div>
+                  ) : (
+                    <Image
+                      src={getImageSrc(book)}
+                      alt={book.title}
+                      fill
+                      className="object-cover"
+                      onError={() => handleImageError(book.id)}
+                      priority={false}
+                    />
+                  )}
 
                   {/* Status Badge */}
                   <div className="absolute top-2 left-2">
@@ -488,7 +530,7 @@ export default function MyBooksPage() {
                   {/* Action Buttons */}
                   <div className="flex items-center justify-between">
                     <Link
-                      href={`/my-books/${book.id}`}
+                      href={`/books/${book.id}`}
                       className="flex items-center space-x-1 px-3 py-1.5 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
                     >
                       <EyeIcon className="h-4 w-4" />
@@ -520,7 +562,7 @@ export default function MyBooksPage() {
                   {book.userReview && (
                     <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-md">
                       <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
-                        "{book.userReview}"
+                        &ldquo;{book.userReview}&rdquo;
                       </p>
                     </div>
                   )}
@@ -542,7 +584,7 @@ export default function MyBooksPage() {
                 : "Start building your personal library by discovering new books"}
             </p>
             <Link
-              href="/discover"
+              href="/explore"
               className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors"
             >
               Discover Books

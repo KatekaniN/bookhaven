@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -10,10 +10,17 @@ import {
   EyeSlashIcon,
   SparklesIcon,
   UserPlusIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useAppStore } from "@/stores/useAppStore";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 export default function SignUpPage() {
+  const { data: session, status } = useSession();
+  const hasCompletedOnboarding = useAppStore(
+    (state) => state.hasCompletedOnboarding
+  );
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -24,6 +31,36 @@ export default function SignUpPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (status === "authenticated" && session) {
+      // If user is logged in, redirect them away from signup page
+      if (hasCompletedOnboarding) {
+        router.push("/");
+      } else {
+        router.push("/onboarding");
+      }
+    }
+  }, [status, session, hasCompletedOnboarding, router]);
+
+  // Show loading spinner while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // Don't render form if user is authenticated (will redirect)
+  if (status === "authenticated") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -321,7 +358,7 @@ export default function SignUpPage() {
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-primary-500/30 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                  <span className="text-sm">✨</span>
+                  <SparklesIcon className="w-4 h-4 text-white" />
                 </div>
                 <p className="text-sm text-white/90">
                   Discover books you'll love
@@ -335,7 +372,7 @@ export default function SignUpPage() {
               </div>
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-accent-500/30 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                  <span className="text-sm">📖</span>
+                  <BookOpenIcon className="w-4 h-4 text-white" />
                 </div>
                 <p className="text-sm text-white/90">Track your progress</p>
               </div>

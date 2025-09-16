@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { useEffect, useState } from "react";
+import { userDataSync } from "@/lib/userDataSync";
+import { getAuth } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { UserBookClubMembership, UserBuddyReadParticipation } from "@/types";
 
 export interface UserPreferences {
   genres: string[];
@@ -50,29 +54,18 @@ export interface UserBook {
   finishedReading?: string;
   userReview?: string;
   reviewDate?: string;
+  isLiked?: boolean;
 }
 
-export interface UserBook {
+export interface ReadingGoal {
   id: string;
-  title: string;
-  author: string;
-  cover: string;
-  description: string;
-  pages: number;
-  publishedYear: number;
-  genre: string[];
-  mood: string[];
-  isbn: string;
-  rating: number;
-  status: "want-to-read" | "currently-reading" | "read";
-  dateAdded: string;
-  currentPage?: number;
-  userRating?: number;
-  notes?: string;
-  startedReading?: string;
-  finishedReading?: string;
-  userReview?: string;
-  reviewDate?: string;
+  year: number;
+  targetBooks: number;
+  targetPages?: number;
+  targetGenres?: string[];
+  isActive: boolean;
+  createdAt: string;
+  description?: string;
 }
 
 interface AppState {
@@ -89,8 +82,20 @@ interface AppState {
   // User books library
   userBooks: UserBook[];
 
+  // Reading goals
+  readingGoals: ReadingGoal[];
+
+  // Book clubs and buddy reads
+  bookClubMemberships: UserBookClubMembership[];
+  buddyReadParticipations: UserBuddyReadParticipation[];
+
   // UI state
   isLoading: boolean;
+
+  // Sync state
+  isSyncInitialized: boolean;
+  isSyncInProgress: boolean;
+  lastSyncTime: string | null;
 
   // Actions
   setOnboardingCompleted: (completed: boolean) => void;
@@ -106,8 +111,32 @@ interface AppState {
   addUserBook: (book: UserBook) => void;
   updateUserBook: (bookId: string, updates: Partial<UserBook>) => void;
   removeUserBook: (bookId: string) => void;
+  isBookInLibrary: (bookId: string) => boolean;
+  getBookFromLibrary: (bookId: string) => UserBook | undefined;
+  clearOldDiscoverBooks: () => void;
+
+  // Reading goals actions
+  setReadingGoals: (goals: ReadingGoal[]) => void;
+  addReadingGoal: (goal: ReadingGoal) => void;
+  updateReadingGoal: (goalId: string, updates: Partial<ReadingGoal>) => void;
+  removeReadingGoal: (goalId: string) => void;
+  getActiveReadingGoal: (year?: number) => ReadingGoal | undefined;
+
+  // Book interaction actions
+  likeBook: (bookId: string, bookData: Partial<UserBook>) => void;
+  unlikeBook: (bookId: string) => void;
+  rateBook: (
+    bookId: string,
+    rating: number,
+    bookData?: Partial<UserBook>
+  ) => void;
 
   setLoading: (loading: boolean) => void;
+
+  // Sync actions
+  setSyncInitialized: (initialized: boolean) => void;
+  setSyncInProgress: (inProgress: boolean) => void;
+  setLastSyncTime: (time: string | null) => void;
 
   // Complex actions
   completeOnboarding: (
@@ -116,6 +145,9 @@ interface AppState {
     authorRatings: AuthorRating[]
   ) => void;
   resetOnboarding: () => void;
+
+  // Helper actions
+  _migrateOldPlaceholders: () => void;
 
   // Computed getters
   getRecommendationData: () => {
@@ -136,46 +168,364 @@ export const useAppStore = create<AppState>()(
       bookRatings: [],
       authorRatings: [],
       userBooks: [],
+      readingGoals: [],
+      // Book clubs and buddy reads
+      bookClubMemberships: [],
+      buddyReadParticipations: [],
       isLoading: false,
 
+      // Sync state
+      isSyncInitialized: false,
+      isSyncInProgress: false,
+      lastSyncTime: null,
+
+      // Helper function to migrate old placeholder URLs
+      _migrateOldPlaceholders: () =>
+        set((state) => ({
+          userBooks: state.userBooks.map((book) => ({
+            ...book,
+            cover: book.cover.includes("via.placeholder.com")
+              ? "/placeholder-book.jpg"
+              : book.cover,
+          })),
+        })),
+
       // Basic setters
-      setOnboardingCompleted: (completed) =>
-        set({ hasCompletedOnboarding: completed }),
+      setOnboardingCompleted: async (completed) => {
+        set({ hasCompletedOnboarding: completed });
+        try {
+          const user = auth.currentUser;
+          if (user?.email && completed) {
+            await userDataSync.initializeUser(user.email);
+            const state = get();
+            await userDataSync.syncUserDataToCloud({
+              onboardingCompleted: completed,
+              preferences: state.userPreferences,
+              bookRatings: state.bookRatings,
+              authorRatings: state.authorRatings,
+              userBooks: state.userBooks,
+              readingGoals: state.readingGoals,
+              bookClubMemberships: state.bookClubMemberships,
+              buddyReadParticipations: state.buddyReadParticipations,
+            });
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for setOnboardingCompleted:", e);
+        }
+      },
 
       setOnboardingStep: (step) => set({ currentOnboardingStep: step }),
 
       setOnboardingInProgress: (inProgress) =>
         set({ isOnboardingInProgress: inProgress }),
 
-      setUserPreferences: (preferences) =>
-        set({ userPreferences: preferences }),
+      setUserPreferences: async (preferences) => {
+        set({ userPreferences: preferences });
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            const state = get();
+            await userDataSync.syncUserDataToCloud({
+              onboardingCompleted: state.hasCompletedOnboarding,
+              preferences,
+              bookRatings: state.bookRatings,
+              authorRatings: state.authorRatings,
+              userBooks: state.userBooks,
+              readingGoals: state.readingGoals,
+              bookClubMemberships: state.bookClubMemberships,
+              buddyReadParticipations: state.buddyReadParticipations,
+            });
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for setUserPreferences:", e);
+        }
+      },
 
-      setBookRatings: (ratings) => set({ bookRatings: ratings }),
+      setBookRatings: async (ratings) => {
+        set({ bookRatings: ratings });
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            const state = get();
+            await userDataSync.syncUserDataToCloud({
+              onboardingCompleted: state.hasCompletedOnboarding,
+              preferences: state.userPreferences,
+              bookRatings: ratings,
+              authorRatings: state.authorRatings,
+              userBooks: state.userBooks,
+              readingGoals: state.readingGoals,
+              bookClubMemberships: state.bookClubMemberships,
+              buddyReadParticipations: state.buddyReadParticipations,
+            });
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for setBookRatings:", e);
+        }
+      },
 
-      setAuthorRatings: (ratings) => set({ authorRatings: ratings }),
+      setAuthorRatings: async (ratings) => {
+        set({ authorRatings: ratings });
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            const state = get();
+            await userDataSync.syncUserDataToCloud({
+              onboardingCompleted: state.hasCompletedOnboarding,
+              preferences: state.userPreferences,
+              bookRatings: state.bookRatings,
+              authorRatings: ratings,
+              userBooks: state.userBooks,
+              readingGoals: state.readingGoals,
+              bookClubMemberships: state.bookClubMemberships,
+              buddyReadParticipations: state.buddyReadParticipations,
+            });
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for setAuthorRatings:", e);
+        }
+      },
 
       // User books actions
-      setUserBooks: (books) => set({ userBooks: books }),
+      setUserBooks: async (books) => {
+        set({ userBooks: books });
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            await userDataSync.syncUserBooksToCloud(books);
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for setUserBooks:", e);
+        }
+      },
+      addUserBook: async (book) => {
+        set((state) => ({ userBooks: [...state.userBooks, book] }));
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            await userDataSync.addBookToLibrary(book);
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for addUserBook:", e);
+        }
+      },
 
-      addUserBook: (book) =>
-        set((state) => ({ userBooks: [...state.userBooks, book] })),
-
-      updateUserBook: (bookId, updates) =>
+      updateUserBook: async (bookId, updates) => {
         set((state) => ({
           userBooks: state.userBooks.map((book) =>
             book.id === bookId ? { ...book, ...updates } : book
           ),
-        })),
+        }));
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            await userDataSync.updateBookInLibrary(bookId, updates);
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for updateUserBook:", e);
+        }
+      },
 
-      removeUserBook: (bookId) =>
+      removeUserBook: async (bookId) => {
         set((state) => ({
           userBooks: state.userBooks.filter((book) => book.id !== bookId),
+        }));
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            await userDataSync.removeBookFromLibrary(bookId);
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for removeUserBook:", e);
+        }
+      },
+
+      clearOldDiscoverBooks: () =>
+        set((state) => ({
+          userBooks: state.userBooks.filter(
+            (book) => !book.id.startsWith("discover-")
+          ),
         })),
+
+      isBookInLibrary: (bookId) => {
+        const state = get();
+        return state.userBooks.some((book) => book.id === bookId);
+      },
+
+      getBookFromLibrary: (bookId) => {
+        const state = get();
+        return state.userBooks.find((book) => book.id === bookId);
+      },
+
+      // Reading goals actions
+      setReadingGoals: async (goals) => {
+        set({ readingGoals: goals });
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            await userDataSync.syncReadingGoalsToCloud(goals);
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for setReadingGoals:", e);
+        }
+      },
+
+      addReadingGoal: async (goal) => {
+        set((state) => ({ readingGoals: [...state.readingGoals, goal] }));
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            const state = get();
+            await userDataSync.syncReadingGoalsToCloud(state.readingGoals);
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for addReadingGoal:", e);
+        }
+      },
+
+      updateReadingGoal: async (goalId, updates) => {
+        console.log("updateReadingGoal called:", { goalId, updates });
+        set((state) => {
+          const updatedGoals = state.readingGoals.map((goal) =>
+            goal.id === goalId ? { ...goal, ...updates } : goal
+          );
+          console.log("Updated goals:", updatedGoals);
+          return {
+            readingGoals: updatedGoals,
+          };
+        });
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            const state = get();
+            await userDataSync.syncReadingGoalsToCloud(state.readingGoals);
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for updateReadingGoal:", e);
+        }
+      },
+
+      removeReadingGoal: async (goalId) => {
+        set((state) => ({
+          readingGoals: state.readingGoals.filter((goal) => goal.id !== goalId),
+        }));
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            const state = get();
+            await userDataSync.syncReadingGoalsToCloud(state.readingGoals);
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for removeReadingGoal:", e);
+        }
+      },
+
+      getActiveReadingGoal: (year) => {
+        const state = get();
+        const currentYear = year || new Date().getFullYear();
+        return state.readingGoals.find(
+          (goal) => goal.year === currentYear && goal.isActive
+        );
+      },
+
+      likeBook: (bookId, bookData) =>
+        set((state) => {
+          const existingBook = state.userBooks.find(
+            (book) => book.id === bookId
+          );
+          if (existingBook) {
+            // Update existing book
+            return {
+              userBooks: state.userBooks.map((book) =>
+                book.id === bookId ? { ...book, isLiked: true } : book
+              ),
+            };
+          } else {
+            // Add new book as liked
+            const newBook: UserBook = {
+              id: bookId,
+              title: bookData.title || "Unknown Title",
+              author: bookData.author || "Unknown Author",
+              cover: bookData.cover || "/placeholder-book.jpg",
+              description: bookData.description || "",
+              rating: bookData.rating || 0,
+              status: "want-to-read",
+              dateAdded: new Date().toISOString().split("T")[0],
+              genre: bookData.genre || [],
+              mood: bookData.mood || [],
+              isbn: bookData.isbn || "",
+              pages: bookData.pages || 0,
+              publishedYear: bookData.publishedYear || new Date().getFullYear(),
+              isLiked: true,
+              ...bookData,
+            };
+            return { userBooks: [...state.userBooks, newBook] };
+          }
+        }),
+
+      unlikeBook: (bookId) =>
+        set((state) => ({
+          userBooks: state.userBooks.map((book) =>
+            book.id === bookId ? { ...book, isLiked: false } : book
+          ),
+        })),
+
+      rateBook: (bookId, rating, bookData) =>
+        set((state) => {
+          const existingBook = state.userBooks.find(
+            (book) => book.id === bookId
+          );
+          if (existingBook) {
+            // Update existing book
+            return {
+              userBooks: state.userBooks.map((book) =>
+                book.id === bookId ? { ...book, userRating: rating } : book
+              ),
+            };
+          } else if (bookData) {
+            // Add new book with rating
+            const newBook: UserBook = {
+              id: bookId,
+              title: bookData.title || "Unknown Title",
+              author: bookData.author || "Unknown Author",
+              cover: bookData.cover || "/placeholder-book.jpg",
+              description: bookData.description || "",
+              rating: bookData.rating || 0,
+              status: "want-to-read",
+              dateAdded: new Date().toISOString().split("T")[0],
+              genre: bookData.genre || [],
+              mood: bookData.mood || [],
+              isbn: bookData.isbn || "",
+              pages: bookData.pages || 0,
+              publishedYear: bookData.publishedYear || new Date().getFullYear(),
+              userRating: rating,
+              ...bookData,
+            };
+            return { userBooks: [...state.userBooks, newBook] };
+          }
+          return state;
+        }),
 
       setLoading: (loading) => set({ isLoading: loading }),
 
+      // Sync actions
+      setSyncInitialized: (initialized) =>
+        set({ isSyncInitialized: initialized }),
+      setSyncInProgress: (inProgress) => set({ isSyncInProgress: inProgress }),
+      setLastSyncTime: (time) => set({ lastSyncTime: time }),
+
       // Complex actions
-      completeOnboarding: (preferences, bookRatings, authorRatings) =>
+      completeOnboarding: async (preferences, bookRatings, authorRatings) => {
         set({
           hasCompletedOnboarding: true,
           isOnboardingInProgress: false,
@@ -183,7 +533,29 @@ export const useAppStore = create<AppState>()(
           bookRatings,
           authorRatings,
           currentOnboardingStep: 1, // Reset for next time
-        }),
+        });
+
+        // Sync completion to cloud
+        try {
+          const user = auth.currentUser;
+          if (user?.email) {
+            await userDataSync.initializeUser(user.email);
+            const state = get();
+            await userDataSync.syncUserDataToCloud({
+              onboardingCompleted: true,
+              preferences,
+              bookRatings,
+              authorRatings,
+              userBooks: state.userBooks,
+              readingGoals: state.readingGoals,
+              bookClubMemberships: state.bookClubMemberships,
+              buddyReadParticipations: state.buddyReadParticipations,
+            });
+          }
+        } catch (e) {
+          console.warn("Cloud sync failed for completeOnboarding:", e);
+        }
+      },
 
       resetOnboarding: () =>
         set({
@@ -193,6 +565,20 @@ export const useAppStore = create<AppState>()(
           userPreferences: null,
           bookRatings: [],
           authorRatings: [],
+        }),
+
+      // Debug action to completely reset the store
+      resetAllData: () =>
+        set({
+          hasCompletedOnboarding: false,
+          isOnboardingInProgress: false,
+          currentOnboardingStep: 1,
+          userPreferences: null,
+          bookRatings: [],
+          authorRatings: [],
+          userBooks: [],
+          readingGoals: [],
+          isLoading: false,
         }),
 
       // Computed getters
@@ -211,9 +597,14 @@ export const useAppStore = create<AppState>()(
       // Only persist certain parts of the state
       partialize: (state) => ({
         hasCompletedOnboarding: state.hasCompletedOnboarding,
+        currentOnboardingStep: state.currentOnboardingStep,
         userPreferences: state.userPreferences,
         bookRatings: state.bookRatings,
         authorRatings: state.authorRatings,
+        userBooks: state.userBooks, // Include userBooks in persistence
+        readingGoals: state.readingGoals, // Include reading goals
+        isSyncInitialized: state.isSyncInitialized,
+        lastSyncTime: state.lastSyncTime,
       }),
       // Add some safeguards to prevent hydration issues
       skipHydration: false,
@@ -306,4 +697,15 @@ export const useAppLoading = () =>
   useAppStore((state) => ({
     isLoading: state.isLoading,
     setLoading: state.setLoading,
+  }));
+
+// Sync state selectors
+export const useSyncState = () =>
+  useAppStore((state) => ({
+    isSyncInitialized: state.isSyncInitialized,
+    isSyncInProgress: state.isSyncInProgress,
+    lastSyncTime: state.lastSyncTime,
+    setSyncInitialized: state.setSyncInitialized,
+    setSyncInProgress: state.setSyncInProgress,
+    setLastSyncTime: state.setLastSyncTime,
   }));

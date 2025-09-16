@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide scrollbars for carousel */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
 :root {
   --toast-bg: #ffffff;
   --toast-color: #374151;
@@ -15,10 +24,11 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   }
 
   body {
-    @apply antialiased;
+    @apply antialiased font-serif;
   }
 
   h1,
@@ -27,7 +37,7 @@
   h4,
   h5,
   h6 {
-    @apply font-semibold;
+    @apply font-semibold font-serif;
   }
 }
 

@@ -5,28 +5,48 @@ import { Providers } from "./providers";
 import { Navigation } from "../components/layout/Navigation";
 import { AuthGuard } from "../components/auth/AuthGuard";
 import OnboardingDataSync from "../components/auth/OnboardingDataSync";
+import UserDataInitializer from "../components/auth/UserDataInitializer";
+import DataMigration from "../components/utils/DataMigration";
+import OfflineSync from "../components/utils/OfflineSync";
 import { SessionDebug } from "../components/debug/SessionDebug";
+import { OnboardingDebug } from "../components/debug/OnboardingDebug";
+import { SyncStatusDebug } from "../components/debug/SyncStatusDebug";
+import { AuthFlowDebug } from "../components/debug/AuthFlowDebug";
+import { CustomCursor } from "../components/ui/CustomCursor";
 import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL || "http://localhost:3000"),
-  title: "BookHaven - Your Reading Companion",
+  title: "Book Haven - Your Reading Companion",
   description:
     "A modern Goodreads alternative for discovering, tracking, and sharing your reading journey",
   manifest: "/manifest.json",
   keywords: ["books", "reading", "reviews", "book club", "social reading"],
   authors: [{ name: "BookHaven Team" }],
-  creator: "BookHaven",
+  creator: "Book Haven",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any", type: "image/x-icon" },
+      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/favicon.ico", sizes: "16x16", type: "image/x-icon" },
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/icons/icon-152x152.png", sizes: "152x152", type: "image/png" },
+      { url: "/icons/icon-180x180.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://bookhaven.app",
-    title: "BookHaven - Your Reading Companion",
+    title: "Book Haven - Your Reading Companion",
     description:
       "A modern Goodreads alternative for discovering, tracking, and sharing your reading journey",
-    siteName: "BookHaven",
+    siteName: "Book Haven",
     images: [
       {
         url: "/og-image.png",
@@ -37,7 +57,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "BookHaven - Your Reading Companion",
+    title: "Book Haven - Your Reading Companion",
     description:
       "A modern Goodreads alternative for discovering, tracking, and sharing your reading journey",
     images: ["/og-image.png"],
@@ -70,10 +90,14 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#B7A3CA" />
       </head>
       <body
-        className={`${inter.className} bg-white dark:bg-gray-900 text-gray-900 dark:text-white`}
+        className={`font-serif bg-white dark:bg-gray-900 text-gray-900 dark:text-white`}
       >
         <Providers>
+          <CustomCursor />
           <OnboardingDataSync />
+          <UserDataInitializer />
+          <DataMigration />
+          <OfflineSync />
           <AuthGuard>
             <div className="min-h-screen flex flex-col">
               <Navigation />
@@ -90,7 +114,10 @@ export default function RootLayout({
               }}
             />
           </AuthGuard>
+          <OnboardingDebug />
           <SessionDebug />
+          <SyncStatusDebug />
+          <AuthFlowDebug />
         </Providers>
       </body>
     </html>

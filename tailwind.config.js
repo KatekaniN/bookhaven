@@ -8,6 +8,9 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
+      screens: {
+        xs: "475px", // Extra small screens
+      },
       colors: {
         primary: {
           50: "#faf8fc",
@@ -45,6 +48,9 @@ module.exports = {
           800: "#a16207",
           900: "#854d0e",
         },
+      },
+      height: {
+        88: "22rem", // 352px - custom height for medium book cards
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],

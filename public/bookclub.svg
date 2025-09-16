@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Book club placeholder image">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.35)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.05)"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#g)"/>
+  <g transform="translate(200,120)" filter="url(#shadow)">
+    <rect x="0" y="0" rx="16" ry="16" width="340" height="430" fill="#fff"/>
+    <rect x="12" y="12" rx="12" ry="12" width="316" height="406" fill="#e5e7eb"/>
+    <rect x="12" y="12" rx="12" ry="12" width="316" height="140" fill="#c7d2fe"/>
+    <rect x="12" y="164" rx="8" ry="8" width="220" height="18" fill="#9ca3af"/>
+    <rect x="12" y="192" rx="8" ry="8" width="280" height="12" fill="#d1d5db"/>
+    <rect x="12" y="212" rx="8" ry="8" width="260" height="12" fill="#d1d5db"/>
+  </g>
+  <g transform="translate(580,160)" filter="url(#shadow)">
+    <rect x="0" y="0" rx="14" ry="14" width="420" height="140" fill="rgba(255,255,255,0.15)"/>
+    <text x="24" y="48" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff">Book Club</text>
+    <text x="24" y="88" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="20" fill="#e5e7eb">A friendly place to read together</text>
+  </g>
+  <g transform="translate(580,340)">
+    <circle cx="22" cy="22" r="22" fill="#22d3ee"/>
+    <circle cx="78" cy="22" r="22" fill="#34d399"/>
+    <circle cx="134" cy="22" r="22" fill="#f472b6"/>
+    <rect x="190" y="6" rx="10" ry="10" width="270" height="32" fill="rgba(255,255,255,0.25)"/>
+    <text x="204" y="30" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="18" fill="#ffffff">Join the discussion →</text>
+  </g>
+</svg>

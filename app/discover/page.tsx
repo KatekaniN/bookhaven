@@ -1,15 +1,35 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { BookCard } from "../../components/books/BookCard";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { useAppStore } from "../../stores/useAppStore";
+import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import {
   MagnifyingGlassIcon,
   SparklesIcon,
   FunnelIcon,
+  ClockIcon,
+  BoltIcon,
+  HeartIcon,
+  StarIcon,
+  MoonIcon,
+  BookOpenIcon,
+  AcademicCapIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+
+interface Book {
+  id: string;
+  title: string;
+  author: string;
+  cover: string;
+  rating: number;
+  reviewCount: number;
+  subjects: string[];
+  mood: string;
+  description: string;
+}
 
 const genres = [
   "Fantasy",
@@ -32,264 +52,222 @@ const genres = [
   "Comedy",
 ];
 
+// Icon mapping function
+const getMoodIcon = (moodName: string) => {
+  const iconClass = "w-4 h-4";
+  switch (moodName) {
+    case "Cozy & Comfortable":
+      return <ClockIcon className={iconClass} />;
+    case "Fast-paced & Exciting":
+      return <BoltIcon className={iconClass} />;
+    case "Emotional & Deep":
+      return <HeartIcon className={iconClass} />;
+    case "Light & Fun":
+      return <StarIcon className={iconClass} />;
+    case "Dark & Mysterious":
+      return <MoonIcon className={iconClass} />;
+    case "Educational":
+      return <BookOpenIcon className={iconClass} />;
+    default:
+      return <SparklesIcon className={iconClass} />;
+  }
+};
+
 const moods = [
   {
     name: "Cozy & Comfortable",
-    icon: "☕",
     color:
       "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
   },
   {
     name: "Fast-paced & Exciting",
-    icon: "⚡",
     color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
   },
   {
     name: "Emotional & Deep",
-    icon: "💙",
     color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
   },
   {
     name: "Light & Fun",
-    icon: "🌟",
     color:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
   },
   {
     name: "Dark & Mysterious",
-    icon: "🌙",
     color:
       "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
   },
   {
     name: "Educational",
-    icon: "📚",
     color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
   },
 ];
 
-// Expanded mock book database
-const ALL_BOOKS = [
-  {
-    id: "discover-1",
-    title: "The House in the Cerulean Sea",
-    author: "TJ Klune",
-    cover: "https://covers.openlibrary.org/b/isbn/9781250217288-L.jpg",
-    rating: 4.5,
-    reviewCount: 45623,
-    subjects: ["Fantasy", "LGBTQ+", "Feel-good"],
-    mood: "Light & Fun",
-    description:
-      "A magical story about found family and love in unexpected places.",
-  },
-  {
-    id: "discover-2",
-    title: "The Silent Patient",
-    author: "Alex Michaelides",
-    cover: "https://covers.openlibrary.org/b/isbn/9781250301697-L.jpg",
-    rating: 4.2,
-    reviewCount: 78291,
-    subjects: ["Thriller", "Mystery", "Psychological"],
-    mood: "Dark & Mysterious",
-    description:
-      "A woman refuses to speak after allegedly murdering her husband.",
-  },
-  {
-    id: "discover-3",
-    title: "Educated",
-    author: "Tara Westover",
-    cover: "https://covers.openlibrary.org/b/isbn/9780399590504-L.jpg",
-    rating: 4.4,
-    reviewCount: 92145,
-    subjects: ["Memoir", "Biography", "Education"],
-    mood: "Educational",
-    description: "A powerful memoir about education and family.",
-  },
-  {
-    id: "discover-4",
-    title: "Where the Crawdads Sing",
-    author: "Delia Owens",
-    cover: "https://covers.openlibrary.org/b/isbn/9780735219090-L.jpg",
-    rating: 4.3,
-    reviewCount: 156789,
-    subjects: ["Historical Fiction", "Mystery", "Nature"],
-    mood: "Emotional & Deep",
-    description:
-      "A mystery about a young woman who raised herself in the marshes.",
-  },
-  {
-    id: "discover-5",
-    title: "The Seven Husbands of Evelyn Hugo",
-    author: "Taylor Jenkins Reid",
-    cover: "https://covers.openlibrary.org/b/isbn/9781501161933-L.jpg",
-    rating: 4.6,
-    reviewCount: 125000,
-    subjects: ["Historical Fiction", "Romance", "LGBTQ+"],
-    mood: "Emotional & Deep",
-    description: "A reclusive Hollywood icon finally tells her story.",
-  },
-  {
-    id: "discover-6",
-    title: "Atomic Habits",
-    author: "James Clear",
-    cover: "https://covers.openlibrary.org/b/isbn/9780735211292-L.jpg",
-    rating: 4.8,
-    reviewCount: 89000,
-    subjects: ["Self-Help", "Productivity", "Psychology"],
-    mood: "Educational",
-    description: "Transform your life with the power of atomic habits.",
-  },
-  {
-    id: "discover-7",
-    title: "The Midnight Library",
-    author: "Matt Haig",
-    cover: "https://covers.openlibrary.org/b/isbn/9780525559474-L.jpg",
-    rating: 4.4,
-    reviewCount: 198000,
-    subjects: ["Fantasy", "Philosophy", "Self-Discovery"],
-    mood: "Cozy & Comfortable",
-    description:
-      "Between life and death lies a library of infinite possibilities.",
-  },
-  {
-    id: "discover-8",
-    title: "Klara and the Sun",
-    author: "Kazuo Ishiguro",
-    cover: "https://covers.openlibrary.org/b/isbn/9780571364886-L.jpg",
-    rating: 4.2,
-    reviewCount: 67000,
-    subjects: ["Science Fiction", "Literary Fiction", "AI"],
-    mood: "Emotional & Deep",
-    description:
-      "An artificial friend observes the world with wonder and heartbreak.",
-  },
-  {
-    id: "discover-9",
-    title: "Dune",
-    author: "Frank Herbert",
-    cover: "https://covers.openlibrary.org/b/isbn/9780441172719-L.jpg",
-    rating: 4.5,
-    reviewCount: 145000,
-    subjects: ["Science Fiction", "Adventure", "Politics"],
-    mood: "Fast-paced & Exciting",
-    description: "An epic tale of power, betrayal, and the future of humanity.",
-  },
-  {
-    id: "discover-10",
-    title: "The Thursday Murder Club",
-    author: "Richard Osman",
-    cover: "https://covers.openlibrary.org/b/isbn/9780241425442-L.jpg",
-    rating: 4.4,
-    reviewCount: 87000,
-    subjects: ["Mystery", "Comedy", "Crime"],
-    mood: "Light & Fun",
-    description: "Four retirees meet weekly to investigate cold cases.",
-  },
-  {
-    id: "discover-11",
-    title: "Becoming",
-    author: "Michelle Obama",
-    cover: "https://covers.openlibrary.org/b/isbn/9781524763138-L.jpg",
-    rating: 4.8,
-    reviewCount: 189000,
-    subjects: ["Memoir", "Politics", "Biography"],
-    mood: "Educational",
-    description: "The deeply personal memoir of the former First Lady.",
-  },
-  {
-    id: "discover-12",
-    title: "The Psychology of Money",
-    author: "Morgan Housel",
-    cover: "https://covers.openlibrary.org/b/isbn/9780857197689-L.jpg",
-    rating: 4.7,
-    reviewCount: 98000,
-    subjects: ["Finance", "Psychology", "Business"],
-    mood: "Educational",
-    description: "Timeless lessons on wealth, greed, and happiness.",
-  },
-  {
-    id: "discover-13",
-    title: "The Handmaid's Tale",
-    author: "Margaret Atwood",
-    cover: "https://covers.openlibrary.org/b/isbn/9780385490818-L.jpg",
-    rating: 4.4,
-    reviewCount: 178000,
-    subjects: ["Dystopian", "Feminism", "Political Fiction"],
-    mood: "Dark & Mysterious",
-    description: "A story of resistance in a dystopian future.",
-  },
-  {
-    id: "discover-14",
-    title: "Circe",
-    author: "Madeline Miller",
-    cover: "https://covers.openlibrary.org/b/isbn/9780316556347-L.jpg",
-    rating: 4.5,
-    reviewCount: 123000,
-    subjects: ["Fantasy", "Mythology", "Feminism"],
-    mood: "Emotional & Deep",
-    description: "The untold story of the Greek goddess Circe.",
-  },
-  {
-    id: "discover-15",
-    title: "The Song of Achilles",
-    author: "Madeline Miller",
-    cover: "https://covers.openlibrary.org/b/isbn/9780062060624-L.jpg",
-    rating: 4.6,
-    reviewCount: 156000,
-    subjects: ["LGBTQ+", "Historical Fiction", "Mythology"],
-    mood: "Emotional & Deep",
-    description: "The love story between Achilles and Patroclus.",
-  },
-  {
-    id: "discover-16",
-    title: "The Alchemist",
-    author: "Paulo Coelho",
-    cover: "https://covers.openlibrary.org/b/isbn/9780061122415-L.jpg",
-    rating: 4.2,
-    reviewCount: 187000,
-    subjects: ["Philosophy", "Adventure", "Inspiration"],
-    mood: "Cozy & Comfortable",
-    description: "A philosophical tale about destiny and following dreams.",
-  },
-  {
-    id: "discover-17",
-    title: "Project Hail Mary",
-    author: "Andy Weir",
-    cover: "https://covers.openlibrary.org/b/isbn/9780593135204-L.jpg",
-    rating: 4.7,
-    reviewCount: 98765,
-    subjects: ["Science Fiction", "Adventure", "Humor"],
-    mood: "Fast-paced & Exciting",
-    description:
-      "A lone astronaut must save humanity in this thrilling sci-fi adventure.",
-  },
-  {
-    id: "discover-18",
-    title: "The Spanish Love Deception",
-    author: "Elena Armas",
-    cover: "https://covers.openlibrary.org/b/isbn/9781668003862-L.jpg",
-    rating: 4.1,
-    reviewCount: 67890,
-    subjects: ["Romance", "Contemporary", "Comedy"],
-    mood: "Light & Fun",
-    description: "A fake dating romance with plenty of laughs and chemistry.",
-  },
-];
+// Function to fetch real books from OpenLibrary API
+const fetchDiscoverBooks = async (): Promise<Book[]> => {
+  try {
+    const searches = [
+      "fantasy",
+      "science fiction",
+      "mystery",
+      "romance",
+      "thriller",
+      "biography",
+      "philosophy",
+      "horror",
+      "young adult",
+      "historical fiction",
+    ];
+
+    const allBooks: Book[] = [];
+
+    for (const search of searches) {
+      const response = await fetch(
+        `https://openlibrary.org/search.json?subject=${search}&limit=5&sort=rating`
+      );
+      const data = await response.json();
+
+      if (data.docs) {
+        const books = data.docs
+          .map((book: any) => {
+            const workId =
+              book.key?.replace("/works/", "") || `work_${Math.random()}`;
+            const isbn = book.isbn?.[0];
+            const cover = isbn
+              ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`
+              : "/placeholder-book.jpg";
+
+            // Map subjects to moods
+            const subjects = book.subject?.slice(0, 3) || [search];
+            let mood = "Educational";
+            if (
+              subjects.some(
+                (s: string) =>
+                  s.toLowerCase().includes("romance") ||
+                  s.toLowerCase().includes("love")
+              )
+            ) {
+              mood = "Emotional & Deep";
+            } else if (
+              subjects.some(
+                (s: string) =>
+                  s.toLowerCase().includes("thriller") ||
+                  s.toLowerCase().includes("mystery")
+              )
+            ) {
+              mood = "Dark & Mysterious";
+            } else if (
+              subjects.some(
+                (s: string) =>
+                  s.toLowerCase().includes("comedy") ||
+                  s.toLowerCase().includes("humor")
+              )
+            ) {
+              mood = "Light & Fun";
+            } else if (
+              subjects.some(
+                (s: string) =>
+                  s.toLowerCase().includes("science") ||
+                  s.toLowerCase().includes("adventure")
+              )
+            ) {
+              mood = "Fast-paced & Exciting";
+            } else if (
+              subjects.some(
+                (s: string) =>
+                  s.toLowerCase().includes("fantasy") ||
+                  s.toLowerCase().includes("cozy")
+              )
+            ) {
+              mood = "Cozy & Comfortable";
+            }
+
+            return {
+              id: `works/${workId}`,
+              title: book.title || "Unknown Title",
+              author: book.author_name?.[0] || "Unknown Author",
+              cover,
+              rating: 4.0 + Math.random() * 1.0, // Generate realistic ratings
+              reviewCount: Math.floor(Math.random() * 100000) + 10000,
+              subjects: subjects.map(
+                (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+              ),
+              mood,
+              description:
+                book.first_sentence?.[0] || `A captivating ${search} book.`,
+            };
+          })
+          .filter((book: Book) => book.title !== "Unknown Title");
+
+        allBooks.push(...books);
+      }
+    }
+
+    // Remove duplicates and limit to 50 books
+    const uniqueBooks = allBooks
+      .filter(
+        (book, index, self) =>
+          index === self.findIndex((b) => b.title === book.title)
+      )
+      .slice(0, 50);
+
+    return uniqueBooks;
+  } catch (error) {
+    console.error("Error fetching books:", error);
+    return [];
+  }
+};
 
 export default function DiscoverPage() {
-  const { addUserBook } = useAppStore();
+  const { addUserBook, clearOldDiscoverBooks } = useAppStore();
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedMood, setSelectedMood] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [displayedBooks, setDisplayedBooks] = useState<typeof ALL_BOOKS>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [allBooks, setAllBooks] = useState<Book[]>([]);
+  const [displayedBooks, setDisplayedBooks] = useState<Book[]>([]);
   const [booksPerPage] = useState(12);
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+
+  const loadBooks = useCallback(
+    async (forceRefresh = false) => {
+      setIsLoading(true);
+      try {
+        // Clear old discover books from cache first
+        if (forceRefresh) {
+          clearOldDiscoverBooks();
+        }
+
+        const books = await fetchDiscoverBooks();
+        setAllBooks(books);
+        setLastRefreshTime(new Date());
+      } catch (error) {
+        console.error("Failed to load books:", error);
+        toast.error("Failed to load books. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearOldDiscoverBooks]
+  );
+
+  // Auto-refresh hook - refreshes every 30 minutes
+  const { manualRefresh, getFormattedTimeUntilNext } = useAutoRefresh({
+    interval: 30 * 60 * 1000, // 30 minutes for more frequent updates
+    enabled: true,
+    onRefresh: () => loadBooks(true),
+  });
+
+  // Load books on component mount
+  useEffect(() => {
+    loadBooks();
+  }, [loadBooks, clearOldDiscoverBooks]);
 
   // Filter books based on current criteria
   const filteredBooks = useMemo(() => {
-    let filtered = ALL_BOOKS;
+    let filtered = allBooks;
 
     // Apply search filter
     if (searchQuery.trim()) {
@@ -322,7 +300,7 @@ export default function DiscoverPage() {
     }
 
     return filtered;
-  }, [searchQuery, selectedGenres, selectedMood]);
+  }, [allBooks, searchQuery, selectedGenres, selectedMood]);
 
   // Update displayed books when filters change
   useEffect(() => {
@@ -402,10 +380,29 @@ export default function DiscoverPage() {
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
             Discover Your Next Great Read
           </h1>
-          <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Find books that match your mood and interests. Use our smart filters
-            to discover hidden gems.
-          </p>
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+              Find books that match your mood and interests. Use our smart
+              filters to discover hidden gems.
+            </p>
+            {lastRefreshTime && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-500">
+                  <ClockIcon className="h-3 w-3" />
+                  <span>
+                    Books refresh automatically in {getFormattedTimeUntilNext()}
+                  </span>
+                </div>
+                <button
+                  onClick={manualRefresh}
+                  disabled={isLoading}
+                  className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? "Refreshing..." : "Refresh now"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Search Bar 
@@ -448,7 +445,7 @@ export default function DiscoverPage() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
               <SparklesIcon className="h-5 w-5 mr-2 text-primary-500" />
-              What's your reading mood?
+              What&apos;s your reading mood?
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {moods.map((mood) => (
@@ -461,7 +458,9 @@ export default function DiscoverPage() {
                       : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800"
                   }`}
                 >
-                  <div className="text-xl sm:text-2xl mb-1">{mood.icon}</div>
+                  <div className="text-xl sm:text-2xl mb-1">
+                    {getMoodIcon(mood.name)}
+                  </div>
                   <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
                     {mood.name}
                   </div>

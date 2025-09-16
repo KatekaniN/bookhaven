@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { signIn, getSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { signIn, getSession, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -9,15 +9,64 @@ import {
   EyeIcon,
   EyeSlashIcon,
   SparklesIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline";
+import { useAppStore } from "../../../stores/useAppStore";
+import { LoadingSpinner } from "../../../components/ui/LoadingSpinner";
 import toast from "react-hot-toast";
 
 export default function SignInPage() {
+  const { data: session, status } = useSession();
+  const hasCompletedOnboarding = useAppStore(
+    (state) => state.hasCompletedOnboarding
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  // Redirect authenticated users
+  useEffect(() => {
+    if (status === "loading") return; // Still loading
+
+    if (session?.user) {
+      // User is authenticated, redirect appropriately
+      if (hasCompletedOnboarding) {
+        router.push("/");
+      } else {
+        router.push("/onboarding");
+      }
+    }
+  }, [session, status, hasCompletedOnboarding, router]);
+
+  // Show loading while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-gray-600 dark:text-gray-300 font-serif">
+            Checking authentication...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is authenticated, show loading while redirecting
+  if (session?.user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-gray-600 dark:text-gray-300 font-serif">
+            Welcome back! Redirecting you to Book Haven...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,26 +104,9 @@ export default function SignInPage() {
   };
 
   const handleGoogleSignIn = async () => {
+    // For OAuth providers, let NextAuth handle redirects fully to avoid race conditions
     try {
-      const result = await signIn("google", {
-        redirect: false,
-        callbackUrl: "/onboarding",
-      });
-
-      console.log("Google sign in result:", result);
-
-      if (result?.error) {
-        console.error("Google sign in error:", result.error);
-        toast.error("Google sign in failed. Please try again.");
-      } else if (result?.ok) {
-        toast.success("Welcome to Book Haven!");
-        // Wait a moment before redirecting to ensure session is set
-        setTimeout(() => {
-          router.push("/onboarding");
-        }, 1000);
-      } else {
-        toast.error("Authentication failed. Please try again.");
-      }
+      await signIn("google", { callbackUrl: "/" });
     } catch (error) {
       console.error("Google sign in error:", error);
       toast.error("Something went wrong with Google sign in.");
@@ -244,7 +276,7 @@ export default function SignInPage() {
 
             <div className="text-center">
               <p className="text-sm text-white drop-shadow-sm">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Link
                   href="/auth/signup"
                   className="font-medium text-primary-600 hover:text-primary-700"
@@ -263,7 +295,7 @@ export default function SignInPage() {
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="space-y-2">
                 <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center mx-auto">
-                  <span className="text-xl">📚</span>
+                  <BookOpenIcon className="w-5 h-5 text-white" />
                 </div>
                 <p className="text-xs text-white/80 drop-shadow-sm">
                   Tracking Books
