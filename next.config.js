@@ -5,6 +5,16 @@ const withPWA = require("next-pwa")({
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
   runtimeCaching: [
+    // Never cache NextAuth endpoints (sessions/callbacks); always hit network
+    {
+      urlPattern: /\/api\/auth\/.*$/,
+      handler: "NetworkOnly",
+      method: "GET",
+      options: {
+        cacheName: "auth-no-cache",
+      },
+    },
+    // App-wide safe default: prefer network, fallback to cache for other requests
     {
       urlPattern: /^https?.*/,
       handler: "NetworkFirst",
@@ -110,8 +120,20 @@ const nextConfig = {
           },
         ],
       },
+      // IMPORTANT: Never cache auth/session endpoints
       {
-        source: "/api/(.*)",
+        source: "/api/auth/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store, no-cache, must-revalidate",
+          },
+        ],
+      },
+      // Enable caching for non-auth API routes that are safe to cache
+      {
+        source:
+          "/api/:segment(buddy-reads|book-clubs|books|featured|nytimes|openlibrary|recommendations|user)/:path*",
         headers: [
           {
             key: "Cache-Control",

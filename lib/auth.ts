@@ -1,62 +1,35 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import GitHubProvider from "next-auth/providers/github";
-import CredentialsProvider from "next-auth/providers/credentials";
+// Email provider and adapter intentionally disabled for now
+
+const isProd = process.env.NODE_ENV === "production";
+
+const providers: any[] = [
+  GoogleProvider({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  }),
+];
+
+// Email passwordless temporarily disabled; no adapter configured
+const adapterConfig = {};
 
 export const authOptions = {
   // Ensure a stable secret; required for JWT sessions to be verifiable across routes
-  secret: process.env.NEXTAUTH_SECRET || "dev-nextauth-secret-change-me",
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!,
-    }),
-    CredentialsProvider({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        // TODO: Implement your own authentication logic here
-        // This is just a placeholder - integrate with Firebase Auth
-        if (credentials?.email && credentials?.password) {
-          return {
-            id: "1",
-            email: credentials.email,
-            name: "Test User",
-          };
-        }
-        return null;
-      },
-    }),
-  ],
+  secret: process.env.NEXTAUTH_SECRET,
+  // Trust Vercel/host headers for callback URLs and cookie domains
+  trustHost: true as const,
+  providers,
+  ...adapterConfig,
   pages: {
     signIn: "/auth/signin",
     signUp: "/auth/signup",
+    verifyRequest: "/auth/verify-request",
   },
   session: {
     strategy: "jwt" as const,
   },
-  // Make cookie behavior explicit; in dev, avoid __Secure prefix and secure cookies over http
-  cookies: {
-    sessionToken: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Secure-next-auth.session-token"
-          : "next-auth.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-  },
+  // Use NextAuth default cookies to avoid misconfiguration in production
   callbacks: {
     async jwt({ token, user, account, profile }: any) {
       if (user) {
@@ -72,17 +45,52 @@ export const authOptions = {
     },
     async session({ session, token }: any) {
       if (token) {
+        // Ensure user object exists
+        // @ts-ignore
+        session.user = session.user || ({} as any);
+        // @ts-ignore
         session.user.id = token.id;
+        // @ts-ignore
         session.user.email = token.email;
+        // @ts-ignore
         session.user.name = token.name;
+        // @ts-ignore
         session.user.image = token.picture;
+        // @ts-ignore
         session.accessToken = token.accessToken;
       }
       return session;
     },
-    async signIn({ user, account, profile }: any) {
-      // Handle successful sign-in
-      console.log("Sign in successful:", { user, account, profile });
+    async signIn({ user, account, profile, email, credentials }: any) {
+      // Basic sanity checks
+      const userEmail = user?.email || email?.email || profile?.email;
+      if (!userEmail) {
+        console.warn("signIn denied: missing email", {
+          provider: account?.provider,
+        });
+        return false;
+      }
+
+      // Optional allowlist or domain restriction via env
+      const allowedEmails = (process.env.ALLOWED_EMAILS || "")
+        .split(",")
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+      const allowedDomain = (process.env.ALLOWED_EMAIL_DOMAIN || "")
+        .trim()
+        .toLowerCase();
+
+      const emailLower = String(userEmail).toLowerCase();
+      if (allowedEmails.length > 0 && !allowedEmails.includes(emailLower)) {
+        console.warn("signIn denied: not in allowlist", emailLower);
+        return false;
+      }
+      if (allowedDomain && !emailLower.endsWith(`@${allowedDomain}`)) {
+        console.warn("signIn denied: domain mismatch", emailLower);
+        return false;
+      }
+
+      // If we got here, allow login
       return true;
     },
     async redirect({ url, baseUrl }: any) {
@@ -94,5 +102,4 @@ export const authOptions = {
   },
   debug: process.env.NODE_ENV === "development",
 };
-
-export default NextAuth(authOptions);
+// Only export authOptions; the route handler binds it in app/api/auth/[...nextauth]/route.ts

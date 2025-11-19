@@ -24,9 +24,7 @@ export default function OfflineSync() {
           await userDataSync.initializeUser(session.user.email);
 
           // The store will automatically sync any changes made while offline
-          toast.success("Your changes have been synced to the cloud!", {
-            duration: 3000,
-          });
+          console.log("(info) Offline changes synced to cloud");
 
           setHasPendingSync(false);
         } catch (error) {

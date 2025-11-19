@@ -17,6 +17,8 @@ dist/
 dist/
 build/
 
+.next/
+
 # Logs
 logs
 *.log

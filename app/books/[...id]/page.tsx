@@ -39,6 +39,14 @@ export default function BookDetailPage() {
   console.log("Book ID array:", bookIdArray);
   console.log("Final book ID:", bookId);
 
+  // Strip onboarding prefix if present
+  let processedBookId = bookId;
+  if (processedBookId.startsWith("onboarding-")) {
+    processedBookId = processedBookId.slice(11); // Remove "onboarding-"
+  }
+
+  console.log("Processed book ID:", processedBookId);
+
   const { userBooks, addUserBook } = useAppStore();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,31 +66,35 @@ export default function BookDetailPage() {
 
       try {
         console.log("Fetching book with ID:", bookId);
+        console.log("Processed book ID:", processedBookId);
 
-        // Fetch from Open Library API
-        if (bookId && (bookId.includes("OL") || bookId.includes("works"))) {
-          console.log("Fetching from Open Library API...");
+        let openLibraryKey: string | null = null;
 
-          // Ensure the bookId has the correct format for the API
-          let apiBookId = bookId;
-
-          // If the bookId doesn't start with "/", add it
-          if (!apiBookId.startsWith("/")) {
-            apiBookId = `/${apiBookId}`;
+        // Check if it's an ISBN (10-13 digits)
+        if (/^\d{10,13}$/.test(processedBookId)) {
+          console.log("Detected ISBN, searching by ISBN...");
+          const searchResult = await OpenLibraryAPI.searchByISBN(processedBookId);
+          if (searchResult.docs.length > 0) {
+            openLibraryKey = searchResult.docs[0].key;
+            console.log("Found OpenLibrary key from ISBN:", openLibraryKey);
+          } else {
+            setError("Book not found for this ISBN");
+            return;
           }
+        } else {
+          // Assume it's an OpenLibrary key
+          openLibraryKey = processedBookId.startsWith("/") ? processedBookId : `/${processedBookId}`;
+          console.log("Using OpenLibrary key:", openLibraryKey);
+        }
 
-          console.log("Original book ID:", bookId);
-          console.log("API book ID:", apiBookId);
-
-          const openLibraryBook = await OpenLibraryAPI.getBookDetails(
-            apiBookId
-          );
+        if (openLibraryKey) {
+          const openLibraryBook = await OpenLibraryAPI.getBookDetails(openLibraryKey);
           console.log("Open Library book response:", openLibraryBook);
 
           if (openLibraryBook) {
             // Transform Open Library book to our Book format
             const transformedBook: Book = {
-              id: bookId,
+              id: bookId, // Use original bookId for consistency with store
               title: openLibraryBook.title || "Unknown Title",
               author: openLibraryBook.authors?.[0]?.key
                 ? await fetchAuthorName(openLibraryBook.authors[0].key)
@@ -96,13 +108,13 @@ export default function BookDetailPage() {
                   ? openLibraryBook.description
                   : openLibraryBook.description?.value ||
                     "No description available.",
-              pages: 0, // Not available in works API
-              publishYear: 0, // Not available in works API
+              pages: openLibraryBook.number_of_pages || 0,
+              publishYear: openLibraryBook.publish_date ? new Date(openLibraryBook.publish_date).getFullYear() : 0,
               subjects: openLibraryBook.subjects?.slice(0, 3) || [],
-              languages: ["English"],
-              isbn: "",
-              rating: 0,
-              openLibraryKey: bookId,
+              languages: ["English"], // Not available in BookDetails
+              isbn: openLibraryBook.isbn_13?.[0] || openLibraryBook.isbn_10?.[0] || "",
+              rating: 0, // Not available in works API
+              openLibraryKey: openLibraryKey,
             };
 
             console.log("Transformed book:", transformedBook);
@@ -122,7 +134,7 @@ export default function BookDetailPage() {
     }
 
     fetchBookData();
-  }, [bookId]);
+  }, [processedBookId]);
 
   async function fetchAuthorName(authorKey: string): Promise<string> {
     try {

@@ -148,7 +148,7 @@ export default function OnboardingDataSync() {
             setAuthorRatings(storedData.authorRatings || []);
             setOnboardingCompleted(true);
 
-            toast.success("Your preferences have been saved and synced!");
+            console.log("(info) Preferences saved and synced");
           } catch (error) {
             console.error("Failed to sync onboarding data:", error);
             toast.error("Failed to sync preferences. Please try again.");

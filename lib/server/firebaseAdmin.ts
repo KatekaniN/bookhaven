@@ -1,56 +1,50 @@
-import type { App } from "firebase-admin/app";
+import { getApps, initializeApp, cert } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import type { Firestore } from "firebase-admin/firestore";
 
-let adminApp: App | null = null;
-let adminFirestore: Firestore | null = null;
-
 /**
- * Initialize firebase-admin if service account env is present.
- * Returns Firestore instance or null when not configured.
+ * Returns a Firestore Admin instance if service account env vars are present.
+ * Safely no-ops on the client and when credentials are missing.
  */
 export function getFirestoreAdmin(): Firestore | null {
-  if (adminFirestore) return adminFirestore;
-
-  // Accept either a JSON string env or individual env vars
-  const saJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-  const projectId =
-    process.env.FIREBASE_PROJECT_ID ||
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-
   try {
-    // Attempt to dynamically import firebase-admin only on server
-    const isServer = typeof window === "undefined";
-    if (!isServer) return null;
+    // Ensure this only runs on the server
+    if (typeof window !== "undefined") return null;
 
-    // If neither JSON nor individual fields are provided, skip admin
+    const projectId = process.env.FIREBASE_PROJECT_ID as string | undefined;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL as string | undefined;
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY as string | undefined;
+
+    // Support optional JSON service account via FIREBASE_SERVICE_ACCOUNT
+    const saJson = process.env.FIREBASE_SERVICE_ACCOUNT as string | undefined;
+
     if (!saJson && !(projectId && clientEmail && privateKey)) {
       return null;
     }
 
-    // Lazy import to keep client bundle clean
-    // eslint-disable-next-line
-    const admin = require("firebase-admin");
-
-    if (!admin.apps.length) {
-      const credential = saJson
-        ? admin.credential.cert(JSON.parse(saJson))
-        : admin.credential.cert({
-            projectId,
-            clientEmail,
-            privateKey,
-          });
-
-      adminApp = admin.initializeApp({ credential });
-    } else {
-      adminApp = admin.apps[0];
+    // Normalize private key
+    if (privateKey) {
+      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+        privateKey = privateKey.slice(1, -1);
+      }
+      privateKey = privateKey.replace(/\\n/g, "\n");
     }
 
-    adminFirestore = admin.firestore();
-    return adminFirestore;
+    if (!getApps().length) {
+      const credential = saJson
+        ? cert(JSON.parse(saJson))
+        : cert({
+            projectId: projectId!,
+            clientEmail: clientEmail!,
+            privateKey: privateKey!,
+          });
+
+      initializeApp({ credential });
+    }
+
+    return getFirestore();
   } catch (e) {
-    console.warn("firebase-admin not available or failed to init:", e);
+    console.error("Failed to init Firebase Admin:", e);
     return null;
   }
 }

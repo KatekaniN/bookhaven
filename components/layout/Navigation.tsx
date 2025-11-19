@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSession, signIn, signOut } from "next-auth/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "../../hooks/useTheme";
 import { useProfileImage } from "../../hooks/useProfileImage";
 import {
@@ -28,6 +28,7 @@ export function Navigation() {
   const { data: session } = useSession();
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
+  const router = useRouter();
   const { shouldShowImage, imageError, isLoading } = useProfileImage(
     session?.user?.image
   );
@@ -63,6 +64,27 @@ export function Navigation() {
     { name: "Book Clubs", href: "/book-clubs", icon: ChatBubbleLeftRightIcon },
     { name: "Library", href: "/library", icon: BookOpenIcon },
   ];
+
+  const handleSignOut = async () => {
+    try {
+      // Do not auto-redirect; manually control navigation to avoid stale state
+      const res = await signOut({
+        redirect: false,
+        callbackUrl: "/auth/signin",
+      });
+      // Push and hard-navigate to ensure fresh session fetch
+      const url = res?.url || "/auth/signin";
+      router.push(url);
+      router.refresh();
+      // Fallback hard reload to fully reset client state
+      if (typeof window !== "undefined") {
+        window.location.assign(url);
+      }
+    } catch (e) {
+      // Best-effort fallback
+      router.push("/auth/signin");
+    }
+  };
 
   return (
     <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
@@ -159,7 +181,7 @@ export function Navigation() {
                   </span>
                 </Link>
                 <button
-                  onClick={() => signOut()}
+                  onClick={handleSignOut}
                   className="btn btn-outline text-sm"
                 >
                   Sign Out
@@ -167,7 +189,7 @@ export function Navigation() {
               </div>
             ) : (
               <button
-                onClick={() => signIn()}
+                onClick={() => router.push("/auth/signin")}
                 className="btn btn-primary text-sm"
               >
                 Sign In
@@ -219,7 +241,7 @@ export function Navigation() {
                   </div>
                 </Link>
                 <button
-                  onClick={() => signOut()}
+                  onClick={handleSignOut}
                   className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
                   title="Sign Out"
                 >
@@ -228,7 +250,7 @@ export function Navigation() {
               </div>
             ) : (
               <button
-                onClick={() => signIn()}
+                onClick={() => router.push("/auth/signin")}
                 className="p-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors"
                 title="Sign In"
               >
@@ -281,6 +303,17 @@ export function Navigation() {
                 <span>{item.name}</span>
               </Link>
             ))}
+            {!session && (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  router.push("/auth/signin");
+                }}
+                className="w-full mt-2 px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -60,15 +60,13 @@ export default function UserDataInitializer() {
             setOnboardingCompleted(cloudData.onboardingCompleted);
           }
 
-          toast.success("Your data has been updated from another device!", {
-            duration: 2000,
-          });
+          // Removed user-facing toast to reduce UX noise
+          console.log("(info) Data updated from another device");
         },
         (error) => {
           console.error("🔄 Real-time sync error:", error);
-          toast.error("Real-time sync temporarily unavailable", {
-            duration: 2000,
-          });
+          // Keep errors minimal: rely on console, no popup
+          console.warn("Real-time sync temporarily unavailable");
         }
       );
     },
@@ -142,9 +140,7 @@ export default function UserDataInitializer() {
         console.log("✅ UserDataInitializer: Initialization complete");
         setSyncInitialized(true);
         setLastSyncTime(new Date().toISOString());
-        toast.success("Your data has been synchronized across devices!", {
-          duration: 3000,
-        });
+        console.log("(info) Initial data synchronization complete");
       } catch (error) {
         console.error("❌ UserDataInitializer: Failed to initialize:", error);
         toast.error(

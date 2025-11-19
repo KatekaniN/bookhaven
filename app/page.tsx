@@ -174,19 +174,31 @@ export default function HomePage() {
     checkAndRefresh,
   ]);
 
-  // Route decisions based purely on NextAuth status to avoid flicker loops after OAuth callback
+  // Route decisions with a server-session verification to avoid post-OAuth race
   useEffect(() => {
     if (status === "loading" || !hasHydrated) return;
 
-    if (status === "unauthenticated") {
-      router.push("/auth/signin");
-      return;
-    }
+    const verifyAndRoute = async () => {
+      if (status === "unauthenticated") {
+        try {
+          const res = await fetch("/api/auth/session", { cache: "no-store" });
+          const data = await res.json();
+          if (data?.user) {
+            // Session exists on the server; let client state catch up
+            return;
+          }
+        } catch {}
+        router.push("/auth/signin");
+        return;
+      }
 
-    if (status === "authenticated" && !hasCompletedOnboarding) {
-      router.push("/onboarding");
-      return;
-    }
+      if (status === "authenticated" && !hasCompletedOnboarding) {
+        router.push("/onboarding");
+        return;
+      }
+    };
+
+    verifyAndRoute();
   }, [status, hasHydrated, hasCompletedOnboarding, router]);
 
   if (status === "loading" || !hasHydrated || !hasInitialized) {
